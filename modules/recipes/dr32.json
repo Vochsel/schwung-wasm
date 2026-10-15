@@ -51,5 +51,9 @@
   ],
   "so_name": "dsp.so",
   "upstream_build": "scripts/build.sh: gcc -O2 -std=c11 -Idsp dsp/*.c; g++ -O3 -std=c++14 -fno-exceptions -fno-rtti -fvisibility=hidden -Idsp -Idsp/engines dsp/engines/*.cpp; gcc -O3 -std=c11 -fvisibility=hidden dsp/engines/*.c; link -shared; dist/dr32/{dsp.so,ui.js,module.json,browser.js,resample.js,canvas.js,env_card.js,chain_params.json,engine_ui.json,engine_tpl.json,samples/,LICENSE,NOTICES.md,help.json}",
-  "wasm_notes": "Kits normally come from Move's factory .ablpreset library (not redistributable); the smoke test runs with whatever the engine synthesises without a kit. -D_GNU_SOURCE: musl hides clock_gettime under strict -std=c11 (glibc doesn't)."
+  "wasm_notes": "Kits normally come from Move's factory .ablpreset library (not redistributable); the smoke test runs with whatever the engine synthesises without a kit. -D_GNU_SOURCE: musl hides clock_gettime under strict -std=c11 (glibc doesn't).",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "loads; needs a drum kit (Move factory .ablpreset kits are not redistributable)"
+  }
 }

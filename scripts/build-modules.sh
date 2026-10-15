@@ -167,7 +167,8 @@ if (cmd === 'vars') {
   // or @response file named in ldflags (static deps, Rust staticlibs).
   const ld = r.ldflags || [];
   const extra = ld.flatMap(t => t.split(',')).filter(t => /\.(a|o)$/.test(t)).map(q);
-  const rsp = ld.filter(t => t.startsWith('@')).map(t => `$(cat ${q(t.slice(1))})`);
+  // response files may hold linker flags; hand only .o/.a paths to llvm-nm
+  const rsp = ld.filter(t => t.startsWith('@')).map(t => `$(tr -s ' \\t' '\\n\\n' < ${q(t.slice(1))} | tr -d '"' | grep -E '\\.(a|o)$')`);
   lines.push(`EXPORTS=$(/emsdk/upstream/bin/llvm-nm --defined-only -j ${objs.map(o => `"${o}"`).join(' ')} ${extra.join(' ')} ${rsp.join(' ')} 2>/dev/null | grep -xE '${ENTRY_POINTS.join('|')}' | sort -u | sed 's/^/_/' | paste -sd, -)`);
   lines.push(`[ -n "$EXPORTS" ] || { echo "error: no host entry point (${ENTRY_POINTS.join(', ')}) defined" >&2; exit 1; }`);
   lines.push('echo "exports: $EXPORTS"');

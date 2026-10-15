@@ -96,7 +96,20 @@ static int vm_led_n;
 static uint8_t vm_display[1024];
 static int vm_display_idx;               /* slice index Move must answer */
 
-static const int major[7] = {0, 2, 4, 5, 7, 9, 11};
+/* Scales for melodic pad layouts (Move offers the same set). Rows step by a
+ * fourth: 3 degrees for 7-note scales, 2 for pentatonics, 5 semitones for
+ * chromatic. */
+typedef struct { const char *name; int n; int deg[12]; } scale_t;
+static const scale_t scales[] = {
+    {"major", 7, {0, 2, 4, 5, 7, 9, 11}},       {"minor", 7, {0, 2, 3, 5, 7, 8, 10}},
+    {"dorian", 7, {0, 2, 3, 5, 7, 9, 10}},      {"phrygian", 7, {0, 1, 3, 5, 7, 8, 10}},
+    {"lydian", 7, {0, 2, 4, 6, 7, 9, 11}},      {"mixolydian", 7, {0, 2, 4, 5, 7, 9, 10}},
+    {"locrian", 7, {0, 1, 3, 5, 6, 8, 10}},     {"harm minor", 7, {0, 2, 3, 5, 7, 8, 11}},
+    {"maj pent", 5, {0, 2, 4, 7, 9}},           {"min pent", 5, {0, 3, 5, 7, 10}},
+    {"chromatic", 12, {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11}},
+};
+#define N_SCALES ((int)(sizeof scales / sizeof scales[0]))
+static const char *note_names[12] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
 
 static void vm_queue(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
     uint8_t cin = (st >= 0xF8) ? 0x0F : (st >> 4);
@@ -114,19 +127,26 @@ static void vm_queue(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
  * Drums: a 4x4 drum rack on the left half from note 36, bottom-left up; the
  * right half continues from 52 so every pad sounds. */
 static int vm_octave_of(int t);
+static void vm_scale_of(int t, int *root, int *sc);
 static int vm_pad_to_note(int pad) {
     int idx = pad - 68;
     int row = idx / 8, col = idx % 8;   /* row 0 is the bottom row */
     if (vm_layout[vm_track & 3]) return col < 4 ? 36 + row * 4 + col : 52 + row * 4 + (col - 4);
-    int degree = col + row * 3;
-    int oct = vm_octave_of(vm_track & 3);
-    return 48 + 12 * oct + major[degree % 7] + 12 * (degree / 7);
+    int t = vm_track & 3, root, sc;
+    vm_scale_of(t, &root, &sc);
+    const scale_t *S = &scales[sc];
+    int oct = vm_octave_of(t);
+    if (S->n == 12) return 48 + root + 12 * oct + col + row * 5;
+    int degree = col + row * (S->n == 7 ? 3 : 2);
+    return 48 + root + 12 * oct + S->deg[degree % S->n] + 12 * (degree / S->n);
 }
 
 static uint8_t vm_pad_colour(int pad) {
     int n = vm_pad_to_note(pad);
     if (vm_layout[vm_track & 3]) return ((pad - 68) % 8) < 4 ? 125 : 124;
-    return (n % 12 == 0) ? 125 : 124;
+    int root, sc;
+    vm_scale_of(vm_track & 3, &root, &sc);
+    return ((n - root) % 12 == 0) ? 125 : 124;
 }
 
 /* Pads Move would light: drum-rack half or roots brighter. */
@@ -151,7 +171,7 @@ static void vm_light_pads(void) {
 #define SEQ_STEPS 64
 #define SEQ_POLY 6
 typedef struct { uint8_t note[SEQ_POLY], vel[SEQ_POLY], n; } seq_step_t;
-typedef struct { seq_step_t step[SEQ_STEPS]; uint8_t len, muted; int8_t octave; uint8_t _r; } seq_track_t;
+typedef struct { seq_step_t step[SEQ_STEPS]; uint8_t len, muted; int8_t octave; uint8_t root, scale, _r[3]; } seq_track_t;
 static seq_track_t seq[4];
 static uint8_t seq_skip[4][SEQ_STEPS][SEQ_POLY];   /* just-recorded notes already heard live */
 static uint8_t seq_sounding[4][SEQ_POLY], seq_sounding_n[4];
@@ -162,10 +182,13 @@ static int vm_last_note[4] = {36, 48, 48, 48};
 static int seq_dirty, seq_led_key = -1;
 static double seq_dirty_at;
 static _Atomic int vm_metronome;
+static _Atomic int vm_swing;          /* 0..60: % of a 16th the off-beats are late */
+static double vm_swing_wait = -1;     /* samples until a delayed off-beat fires */
 static int vm_click_left, vm_click_accent;
-#define SEQ_PATH "/data/UserData/schwung-wasm/sequencer-v2.bin"
+#define SEQ_PATH "/data/UserData/schwung-wasm/sequencer-v3.bin"
 
 static int vm_octave_of(int t) { return seq[t].octave; }
+static void vm_scale_of(int t, int *root, int *sc) { *root = seq[t].root % 12; *sc = seq[t].scale < N_SCALES ? seq[t].scale : 0; }
 static int seq_len(int t) { return seq[t].len ? seq[t].len : 16; }
 static int seq_track_pos(int t) { return vm_pos < 0 ? -1 : vm_pos % seq_len(t); }
 static void seq_touch(void) { seq_dirty = 1; seq_dirty_at = emscripten_get_now(); seq_led_key = -1; }
@@ -254,7 +277,8 @@ static void seq_on_tick(void) {
     }
     if (vm_tick % 6 == 0) {
         vm_pos = vm_tick / 6;
-        seq_sixteenth();
+        if ((vm_pos & 1) && vm_swing > 0) vm_swing_wait = (sample_rate * 60.0 / (vm_bpm * 4.0)) * vm_swing / 100.0;
+        else seq_sixteenth();
         /* follow the playhead's page on the selected track while playing */
         int p = seq_track_pos(vm_track) / 16;
         if (vm_held_step < 0 && p != vm_page[vm_track] && seq_len(vm_track) > 16) { vm_page[vm_track] = p; seq_led_key = -1; }
@@ -393,6 +417,10 @@ static void vm_transport(void) {
         if (seq_dirty && emscripten_get_now() - seq_dirty_at > 1500) seq_save();
         return;
     }
+    if (vm_swing_wait >= 0) {
+        vm_swing_wait -= FRAMES;
+        if (vm_swing_wait < 0) seq_sixteenth();
+    }
     double per_tick = sample_rate * 60.0 / (vm_bpm * 24.0);
     vm_clock_acc += FRAMES;
     while (vm_clock_acc >= per_tick) {
@@ -437,8 +465,12 @@ static void vm_draw_screen(void) {
     snprintf(buf, sizeof buf, "TRACK %d", vm_track + 1);
     vm_text(0, 14, buf, 2);
     if (vm_layout[vm_track & 3]) vm_text(0, 33, "Drum rack", 1);
-    else { snprintf(buf, sizeof buf, "C major, oct %+d", seq[vm_track].octave); vm_text(0, 33, buf, 1); }
-    snprintf(buf, sizeof buf, "%d steps%s", seq_len(vm_track), vm_metronome ? "  click" : "");
+    else {
+        int root, sc; vm_scale_of(vm_track, &root, &sc);
+        snprintf(buf, sizeof buf, "%s %s  oct %+d", note_names[root], scales[sc].name, seq[vm_track].octave);
+        vm_text(0, 33, buf, 1);
+    }
+    snprintf(buf, sizeof buf, "%d steps%s%s", seq_len(vm_track), vm_metronome ? " click" : "", vm_swing ? " swing" : "");
     vm_text(0, 45, buf, 1);
     if (vm_rec) vm_text(128 - vm_text_w("REC", 2), 14, "REC", 2);
     else if (vm_playing && vm_pos >= 0) {
@@ -456,7 +488,7 @@ static void vm_update_screen(void) {
     int p = vm_playing ? seq_track_pos(vm_track) : -1;
     int key = vm_track | (vm_layout[vm_track & 3] << 2) | (vm_playing << 3) | (vm_rec << 4) | ((p + 1) << 5) |
               (seq[vm_track].muted << 12) | ((seq[vm_track].octave + 4) << 13) | (seq_len(vm_track) << 16) |
-              (vm_metronome << 23) | ((int)(vm_bpm * 10) << 24);
+              (vm_metronome << 23) | ((int)(vm_bpm * 10) << 24) ^ (seq[vm_track].root * 7 + seq[vm_track].scale * 131 + vm_swing * 977);
     if (key != vm_screen_key) { vm_screen_key = key; vm_draw_screen(); }
 }
 
@@ -707,6 +739,17 @@ EMSCRIPTEN_KEEPALIVE uint32_t *sw_ext_w(void) { return (uint32_t *)&ext_w; }
 EMSCRIPTEN_KEEPALIVE void sw_set_pad_layout(int track, int drums) { if (track >= 0 && track < 4) { vm_layout[track] = drums ? 1 : 0; vm_relight = 1; } }
 EMSCRIPTEN_KEEPALIVE int sw_get_track(void) { return vm_track; }
 EMSCRIPTEN_KEEPALIVE int sw_get_pad_layout(int track) { return (track >= 0 && track < 4) ? vm_layout[track] : 0; }
+EMSCRIPTEN_KEEPALIVE void sw_set_scale(int track, int root, int scale) {
+    if (track < 0 || track > 3) return;
+    seq[track].root = (uint8_t)(((root % 12) + 12) % 12);
+    seq[track].scale = (uint8_t)(scale >= 0 && scale < N_SCALES ? scale : 0);
+    vm_relight = 1; seq_dirty = 1;
+}
+EMSCRIPTEN_KEEPALIVE int sw_get_scale(int track) { return (track >= 0 && track < 4) ? seq[track].root | (seq[track].scale << 8) : 0; }
+EMSCRIPTEN_KEEPALIVE const char *sw_scale_name(int i) { return i >= 0 && i < N_SCALES ? scales[i].name : ""; }
+EMSCRIPTEN_KEEPALIVE int sw_scale_count(void) { return N_SCALES; }
+EMSCRIPTEN_KEEPALIVE void sw_set_swing(int pct) { vm_swing = pct < 0 ? 0 : pct > 60 ? 60 : pct; }
+EMSCRIPTEN_KEEPALIVE int sw_get_swing(void) { return vm_swing; }
 EMSCRIPTEN_KEEPALIVE void sw_set_metronome(int on) { vm_metronome = on ? 1 : 0; }
 EMSCRIPTEN_KEEPALIVE int sw_get_metronome(void) { return vm_metronome; }
 EMSCRIPTEN_KEEPALIVE void sw_set_bpm(float bpm) { if (bpm >= 20 && bpm <= 300) vm_bpm = bpm; }

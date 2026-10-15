@@ -80,9 +80,10 @@ for (const m of mods) {
       r.peak = await play([48, 52, 55], 700);
       await page.evaluate(() => { window.M._sw_transport(0); });
     }
+    else { r.skipped = 'tool/overtake: no audio check here'; }
     const f1 = await frames();
     r.realtime = +(((f1 - f0) * 128 / 44100) / ((Date.now() - t0) / 1000)).toFixed(2);   // engine kept up?
-    r.ok = r.peak > 50;
+    r.ok = r.skipped ? r.realtime > 0.9 : r.peak > 50;
   } catch (e) { r.error = String(e).slice(0, 200); r.ok = false; }
   results.push(r);
   console.log(`${r.ok ? 'ok  ' : 'FAIL'} ${m.type.padEnd(16)} ${m.id.padEnd(18)} peak=${r.peak}${r.dry !== undefined ? ' dry=' + r.dry : ''} rt=${r.realtime}`);

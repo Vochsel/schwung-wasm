@@ -122,11 +122,38 @@ repo's own `scripts/build.sh` (or `Makefile`/`package.sh`) packaging step.
 Every translation unit is compiled as
 
 ```
-emcc|em++ -c -O2 -fPIC -pthread \
+emcc|em++ -c -O2 -fPIC -pthread -fvisibility=hidden [-fvisibility-inlines-hidden for C++] \
   -include /w/compat/include/schwung_module_prelude.h -include /w/compat/wasm_compat.h \
   <includes> <defines> <cflags|cxxflags> <file>
-emcc|em++ -O2 -pthread -sSIDE_MODULE=1 <objects> -o <so_name>
+EXPORTS = host entry points the objects (and any .o/.a/@rsp in ldflags) define   # llvm-nm
+emcc|em++ -O2 -pthread -sSIDE_MODULE=2 -sEXPORTED_FUNCTIONS=$EXPORTS <ldflags> <objects> -o <so_name>
 ```
+
+### Symbol isolation (one global namespace)
+
+Emscripten's dynamic linker has a single global symbol namespace; `RTLD_LOCAL`
+does not isolate side modules the way it does on the device. When every
+symbol was exported, a module loaded later bound its own calls to an earlier
+module's same-named export: freak and plaits both contain `plaits::`, and
+loading plaits after freak trapped "null function" in the engine. So:
+
+- Every module is compiled with `-fvisibility=hidden`, and C++ with
+  `-fvisibility-inlines-hidden` as well.
+- Every module is linked `SIDE_MODULE=2`, exporting only the host entry
+  points it defines. The entry points are `move_plugin_init_v2`,
+  `move_plugin_init_v1`, `move_audio_fx_init_v2`, `move_audio_fx_init_v1`,
+  `move_midi_fx_init`, `move_audio_fx_on_midi`, `move_plugin_render_split`,
+  and `clap_entry` for the airwindows `.clap`. These are every name
+  `build/schwung/src` dlsyms from a module.
+- Dependencies built in `pre_build` (CMake or configure) must pass
+  `-fvisibility=hidden -fvisibility-inlines-hidden` too. wasm-ld still exports
+  default-visibility symbols from archives in a `-shared` link.
+- `build-modules.sh` fails if two staged modules export the same non-entry
+  symbol, and it reports the count of non-entry exports. About 116 remain,
+  mostly RTTI for `std::` types and two FluidLite hooks, all unique.
+- `test-module.mjs --coload` dlopens every other built module into the same
+  process before testing each one. This is a regression test for this bug
+  class.
 
 Upstream optimisation flags (`-O3`, `-Ofast`, `-march=…`) are replaced by `-O2`.
 Where upstream used `-Ofast` or `-ffast-math`, the recipe adds `-ffast-math` to
@@ -205,10 +232,24 @@ content, and never ROMs.
   under `ALLOW_MEMORY_GROWTH`, and was clean with a fixed 1 GB
   `INITIAL_MEMORY`. A later run with growth also passed. Prefer a pre-sized
   heap in the engine.
+- **C++ exceptions.** Modules and the engine use Emscripten's default (no
+  wasm EH; `__cxa_throw` comes from the JS library and aborts). `surge` needs
+  `-fwasm-exceptions` in both the module and the main module: its init and
+  `std::filesystem` code depend on try/catch. performance-fx probably does
+  too. This is an engine-wide decision.
+- **Nested dlopen deadlocks.** A static constructor that calls `dlopen()`
+  while the host is inside `dlopen()` hangs silently, because Emscripten's
+  dlopen lock isn't recursive. Surge's MTS-ESP client did this; it is patched.
+- **Import check.** `test-module.mjs` fails a module that imports a symbol
+  the main module provides neither as a wasm export nor as a JS-library
+  function. Emscripten otherwise stubs it lazily, and it only traps when first
+  called, often on a worker.
 - **dlopen.** `wasm_compat.h` maps `dlopen` to `schwung_wasm_dlopen`
-  (`engine/dlsync.c`, which waits for the device thread to sync). The test host
-  defines it as a plain passthrough, so modules that dlopen something
-  themselves import `schwung_wasm_dlopen` and link in both hosts.
+  (`engine/dlsync.c`, which waits for the device thread to sync), and `dlsym`
+  to `schwung_wasm_dlsym`. The test host defines both as plain passthroughs,
+  so modules that dlopen something themselves (clap, dr32) link in both
+  hosts. Dependencies built by their own CMake (surge, nam) don't get the
+  macro.
 
 - **Exports.** `MAIN_MODULE=1` exports all of libc, so it just works. With
   `MAIN_MODULE=2` the engine must export at least every symbol listed in
@@ -251,120 +292,213 @@ content, and never ROMs.
 ## Built modules
 
 <!-- TABLE -->
-Status: default run / `--threaded` run. Latest results are in `build/module-test/results.json`.
+**106 modules built; 106/106 pass all three test modes** (default / `--threaded` / `--coload`). By survey class: A: 57, B: 46, C: 3.
+Results are in `build/module-test/results-{default,threaded,coload}.json`.
 
-| id | type | repo @ pin | licence | dsp | test | level | notes |
-|---|---|---|---|---|---|---|---|
-| `303` | sound_generator | [charlesvestal/schwung-303](https://github.com/charlesvestal/schwung-303) `7680578` | GPL-3.0 | `dsp.so` 69 KB | pass / pass | peak -4.15 dBFS |  |
-| `4k-eq` | audio_fx | [athousanddetails/schwung-4keq](https://github.com/athousanddetails/schwung-4keq) `3493c94` | GPL-3.0 | `4k-eq.so` 61 KB | pass / pass | peak -4.19 dBFS, wet-dry -14.35 |  |
-| `6w6` | sound_generator | [athousanddetails/schwung-6W6](https://github.com/athousanddetails/schwung-6W6) `2bda07e` | GPL-3.0 | `dsp.so` 65 KB | pass / pass | peak -6.62 dBFS |  |
-| `8w8` | sound_generator | [athousanddetails/schwung-8W8](https://github.com/athousanddetails/schwung-8W8) `6fa3f70` | GPL-3.0 | `dsp.so` 76 KB | pass / pass | peak 0 dBFS |  |
-| `9w9` | sound_generator | [athousanddetails/schwung-9W9](https://github.com/athousanddetails/schwung-9W9) `8e9aebd` | GPL-3.0 | `dsp.so` 55 KB | pass / pass | peak -3.76 dBFS |  |
-| `ambiotica` | audio_fx | [charlesvestal/schwung-ambiotica](https://github.com/charlesvestal/schwung-ambiotica) `ac710ba` | MIT | `ambiotica.so` 16 KB | pass / pass | peak -7.05 dBFS, wet-dry -17.17 |  |
-| `bouba-kiki` | sound_generator | [charlesvestal/schwung-bouba-kiki](https://github.com/charlesvestal/schwung-bouba-kiki) `2c2ee4b` | MIT | `dsp.so` 27 KB | pass / pass | peak -0.09 dBFS |  |
-| `braids` | sound_generator | [charlesvestal/schwung-braids](https://github.com/charlesvestal/schwung-braids) `5920d30` | MIT | `dsp.so` 124 KB | pass / pass | peak -7.15 dBFS |  |
-| `busdriver` | audio_fx | [legsmechanical/schwung-busdriver](https://github.com/legsmechanical/schwung-busdriver) `36b6788` | MIT | `busdriver.so` 26 KB | pass / pass | peak -1.1 dBFS, wet-dry -14.94 |  |
-| `chiptune` | sound_generator | [charlesvestal/schwung-chiptune](https://github.com/charlesvestal/schwung-chiptune) `f792807` | MIT | `dsp.so` 50 KB | pass / pass | peak -15.69 dBFS | Upstream isolates gb_snd_emu's Blip_Buffer from Nes_Snd_Emu's via -fvisibility=hidden +… |
-| `chonk` | sound_generator | [legsmechanical/schwung-chonk](https://github.com/legsmechanical/schwung-chonk) `da41ad0` | GPL-3.0 | `dsp.so` 42 KB | pass / pass | peak -8.09 dBFS |  |
-| `chordism` | sound_generator | [charlesvestal/schwung-chordism](https://github.com/charlesvestal/schwung-chordism) `2a65614` | MIT | `dsp.so` 84 KB | pass / pass | peak -8.9 dBFS |  |
-| `chowtape` | audio_fx | [charlesvestal/schwung-chowtape](https://github.com/charlesvestal/schwung-chowtape) `8a2a6d0` | GPL-3.0 | `chowtape.so` 14 KB | pass / pass | peak -2.16 dBFS, wet-dry -25.04 |  |
-| `cloudseed` | audio_fx | [charlesvestal/schwung-cloudseed](https://github.com/charlesvestal/schwung-cloudseed) `fdbc24b` | MIT | `cloudseed.so` 17 KB | pass / pass | peak -2.75 dBFS, wet-dry -16.51 |  |
-| `cw78` | sound_generator | [athousanddetails/schwung-cw-78](https://github.com/athousanddetails/schwung-cw-78) `e4b529e` | GPL-3.0 | `dsp.so` 69 KB | pass / pass | peak -7.66 dBFS |  |
-| `dexed` | sound_generator | [charlesvestal/schwung-dx7](https://github.com/charlesvestal/schwung-dx7) `07f7fed` | GPL-3.0 | `dsp.so` 63 KB | pass / pass | peak -15.24 dBFS |  |
-| `dissolver` | audio_fx | [filliformes/dissolver-move](https://github.com/filliformes/dissolver-move) `0edff5f` | GPL-3.0 | `dissolver.so` 30 KB | pass / pass | peak -9.84 dBFS, wet-dry -11.85 |  |
-| `ducker` | audio_fx | [charlesvestal/schwung-ducker](https://github.com/charlesvestal/schwung-ducker) `0f1c932` | MIT | `ducker.so` 7 KB | pass / pass | peak -6.23 dBFS, wet-dry -20.98 |  |
-| `essaim` | sound_generator | [filliformes/essaim-move](https://github.com/filliformes/essaim-move) `22f63b7` | MIT | `dsp.so` 33 KB | pass / pass | peak -12.99 dBFS |  |
-| `eucalypso` | midi_fx | [handcraftedcc/move-everything-eucalypso](https://github.com/handcraftedcc/move-everything-eucalypso) `f0ff525` | MIT | `dsp.so` 23 KB | pass / pass | 3 notes out |  |
-| `fizzik` | sound_generator | [filliformes/fizzik-move](https://github.com/filliformes/fizzik-move) `1af291e` | MIT | `dsp.so` 55 KB | pass / pass | peak -10.75 dBFS |  |
-| `freak` | sound_generator | [handcraftedcc/move-everything-mrhyde](https://github.com/handcraftedcc/move-everything-mrhyde) `3c47f35` | MIT | `dsp.so` 250 KB | pass / pass | peak -6.19 dBFS |  |
-| `gate` | audio_fx | [charlesvestal/schwung-gate](https://github.com/charlesvestal/schwung-gate) `49bc5a5` | MIT | `gate.so` 5 KB | pass / pass | peak -6.23 dBFS, wet-dry -40.63 |  |
-| `granular` | audio_fx | [filliformes/boris-move](https://github.com/filliformes/boris-move) `2f8f61c` | GPL-3.0 | `granular.so` 17 KB | pass / pass | peak -5.51 dBFS, wet-dry -23.47 |  |
-| `groovebank` | midi_fx | [mission-minnow/groovebank](https://github.com/mission-minnow/groovebank) `4edfa2f` | MIT | `dsp.so` 13 KB | pass / pass | 7 notes out |  |
-| `hera` | sound_generator | [charlesvestal/schwung-hera](https://github.com/charlesvestal/schwung-hera) `7bcf8b8` | GPL-3.0 | `dsp.so` 40 KB | pass / pass | peak -21.09 dBFS |  |
-| `hush1` | sound_generator | [charlesvestal/schwung-hush1](https://github.com/charlesvestal/schwung-hush1) `598ab90` | MIT | `dsp.so` 36 KB | pass / pass | peak -10.23 dBFS |  |
-| `junologue-chorus` | audio_fx | [charlesvestal/schwung-junologue-chorus](https://github.com/charlesvestal/schwung-junologue-chorus) `0b1ecd9` | MIT | `junologue-chorus.so` 4 KB | pass / pass | peak -3.64 dBFS, wet-dry -12.67 |  |
-| `krautdrums` | sound_generator | [filliformes/krautdrums-move](https://github.com/filliformes/krautdrums-move) `c359afe` | MIT | `dsp.so` 41 KB | pass / pass | peak -11.4 dBFS |  |
-| `maze-voice` | sound_generator | [sd88me/schwung-maze](https://github.com/sd88me/schwung-maze) `e774a67` | MIT | `dsp.so` 14 KB | pass / pass | peak -4 dBFS |  |
-| `mono-voice` | sound_generator | [timncox/schwung-mono](https://github.com/timncox/schwung-mono) `ce37774` | MIT | `dsp.so` 77 KB | pass / pass | peak -3.62 dBFS |  |
-| `moog` | sound_generator | [charlesvestal/schwung-moog](https://github.com/charlesvestal/schwung-moog) `4f1f658` | MIT | `dsp.so` 14 KB | pass / pass | peak -10.96 dBFS |  |
-| `mverb` | audio_fx | [charlesvestal/schwung-mverb](https://github.com/charlesvestal/schwung-mverb) `edb2cba` | GPL-3.0 | `mverb.so` 15 KB | pass / pass | peak -6 dBFS, wet-dry -20.34 |  |
-| `noisemaker` | sound_generator | [legsmechanical/schwung-noisemaker](https://github.com/legsmechanical/schwung-noisemaker) `543fc70` | GPL-2.0 | `dsp.so` 272 KB | pass / pass | peak -11.08 dBFS |  |
-| `nusaw` | sound_generator | [charlesvestal/schwung-nusaw](https://github.com/charlesvestal/schwung-nusaw) `e378773` | MIT | `dsp.so` 17 KB | pass / pass | peak -5.57 dBFS |  |
-| `obxd` | sound_generator | [charlesvestal/schwung-obxd](https://github.com/charlesvestal/schwung-obxd) `f02973f` | GPL-3.0 | `dsp.so` 123 KB | pass / pass | peak -10.01 dBFS |  |
-| `ottx` | audio_fx | [legsmechanical/schwung-ottx](https://github.com/legsmechanical/schwung-ottx) `8035c5e` | GPL-3.0 | `ottx.so` 17 KB | pass / pass | peak -0.23 dBFS, wet-dry -6.62 |  |
-| `palette` | audio_fx | [filliformes/palette-move](https://github.com/filliformes/palette-move) `7a5a142` | MIT | `palette.so` 70 KB | pass / pass | peak -2.34 dBFS, wet-dry -36.34 |  |
-| `pixel-walkers` | midi_fx | [mestela/schwung-pixel-walkers](https://github.com/mestela/schwung-pixel-walkers) `5bc3df9` | MIT | `dsp.so` 9 KB | pass / pass | 24 notes out |  |
-| `plaits` | sound_generator | [j3threejay/move-anything-plaits](https://github.com/j3threejay/move-anything-plaits) `6d2ab08` | MIT | `dsp.so` 228 KB | pass / pass | peak -9.61 dBFS |  |
-| `psxverb` | audio_fx | [charlesvestal/schwung-psxverb](https://github.com/charlesvestal/schwung-psxverb) `c8cc042` | MIT | `psxverb.so` 8 KB | pass / pass | peak -4.89 dBFS, wet-dry -20.13 |  |
-| `ruminant` | audio_fx | [mestela/schwung-ruminant](https://github.com/mestela/schwung-ruminant) `d6cdedc` | MIT | `ruminant.so` 6 KB | pass / pass | peak -4.94 dBFS, wet-dry -14.51 |  |
-| `signal` | sound_generator | [filliformes/signal-move](https://github.com/filliformes/signal-move) `77b6a88` | GPL-3.0 | `dsp.so` 88 KB | pass / pass | peak -17.07 dBFS |  |
-| `simian` | sound_generator | [legsmechanical/schwung-simian](https://github.com/legsmechanical/schwung-simian) `647c2bb` | GPL-3.0 | `dsp.so` 114 KB | pass / pass | peak -6.22 dBFS |  |
-| `sophie` | sound_generator | [mestela/schwung-sophie](https://github.com/mestela/schwung-sophie) `abd132d` | MIT | `dsp.so` 20 KB | pass / pass | peak -8.81 dBFS |  |
-| `spectra` | audio_fx | [filliformes/spectra-move](https://github.com/filliformes/spectra-move) `c631fff` | MIT | `spectra.so` 31 KB | pass / pass | peak 0 dBFS, wet-dry -12.41 |  |
-| `stereoid` | audio_fx | [legsmechanical/schwung-stereoid](https://github.com/legsmechanical/schwung-stereoid) `7efecf1` | MIT | `stereoid.so` 10 KB | pass / pass | peak -1.49 dBFS, wet-dry -22.64 |  |
-| `structor` | audio_fx | [filliformes/structor-move](https://github.com/filliformes/structor-move) `db3595e` | MIT | `structor.so` 83 KB | pass / pass | peak -2.21 dBFS, wet-dry -12.53 |  |
-| `superarp` | midi_fx | [handcraftedcc/move-everything-superarp](https://github.com/handcraftedcc/move-everything-superarp) `6eefd02` | MIT | `dsp.so` 26 KB | pass / pass | 13 notes out |  |
-| `tape-echo2` | audio_fx | [athousanddetails/schwung-tape-echo2](https://github.com/athousanddetails/schwung-tape-echo2) `da2e6b5` | GPL-3.0 | `tape-echo2.so` 53 KB | pass / pass | peak -0.46 dBFS, wet-dry -17.4 |  |
-| `tapedelay` | audio_fx | [charlesvestal/schwung-space-delay](https://github.com/charlesvestal/schwung-space-delay) `87e0cbf` | MIT | `tapedelay.so` 7 KB | pass / pass | peak -4.3 dBFS, wet-dry -18.2 |  |
-| `tapescam` | audio_fx | [charlesvestal/schwung-tapescam](https://github.com/charlesvestal/schwung-tapescam) `e9ab1ae` | MIT | `tapescam.so` 17 KB | pass / pass | peak -2.82 dBFS, wet-dry -11.86 |  |
-| `usefulity` | audio_fx | [charlesvestal/schwung-usefulity](https://github.com/charlesvestal/schwung-usefulity) `5bb2f00` | MIT | `usefulity.so` 7 KB | pass / pass | peak -6.23 dBFS, wet-dry -999 | output == input (pass-through at defaults) |
-| `verglas` | audio_fx | [filliformes/verglas-move](https://github.com/filliformes/verglas-move) `4c159d8` | MIT | `verglas.so` 110 KB | pass / pass | peak -6.78 dBFS, wet-dry -16.17 |  |
-| `vocoder` | audio_fx | [charlesvestal/schwung-vocoder](https://github.com/charlesvestal/schwung-vocoder) `261ce6a` | MIT | `vocoder.so` 7 KB | pass / pass | peak 0 dBFS, wet-dry -5.17 | 48% of samples at full scale |
-| `war_bells` | audio_fx | [seajaysec/war-bells](https://github.com/seajaysec/war-bells) `bd13e89` | AGPL-3.0 | `war_bells.so` 65 KB | pass / pass | peak -6.57 dBFS, wet-dry -19.79 |  |
-| `wurl` | sound_generator | [filliformes/wurl-move](https://github.com/filliformes/wurl-move) `2d5b77d` | GPL-3.0 | `dsp.so` 26 KB | pass / pass | peak -10.25 dBFS |  |
+| id | type | class | repo @ pin | licence | dsp | test (default / threaded / coload) | level | notes |
+|---|---|---|---|---|---|---|---|---|
+| `303` | sound_generator | A | [charlesvestal/schwung-303](https://github.com/charlesvestal/schwung-303) `7680578` | GPL-3.0 | `dsp.so` 38 KB | pass / pass / pass | peak -4.15 dB |  |
+| `4k-eq` | audio_fx | A | [athousanddetails/schwung-4keq](https://github.com/athousanddetails/schwung-4keq) `3493c94` | GPL-3.0 | `4k-eq.so` 52 KB | pass / pass / pass | peak -4.19 dB, wet-dry -14.35 |  |
+| `6w6` | sound_generator | A | [athousanddetails/schwung-6W6](https://github.com/athousanddetails/schwung-6W6) `2bda07e` | GPL-3.0 | `dsp.so` 61 KB | pass / pass / pass | peak -6.62 dB |  |
+| `8w8` | sound_generator | A | [athousanddetails/schwung-8W8](https://github.com/athousanddetails/schwung-8W8) `6fa3f70` | GPL-3.0 | `dsp.so` 74 KB | pass / pass / pass | peak 0 dB |  |
+| `9w9` | sound_generator | A | [athousanddetails/schwung-9W9](https://github.com/athousanddetails/schwung-9W9) `8e9aebd` | GPL-3.0 | `dsp.so` 54 KB | pass / pass / pass | peak -3.76 dB |  |
+| `ambiotica` | audio_fx | A | [charlesvestal/schwung-ambiotica](https://github.com/charlesvestal/schwung-ambiotica) `ac710ba` | MIT | `ambiotica.so` 15 KB | pass / pass / pass | peak -7.05 dB, wet-dry -17.17 |  |
+| `aphex` | sound_generator | B | [filliformes/aphex-move](https://github.com/filliformes/aphex-move) `9246640` | MIT | `dsp.so` 64 KB | pass / pass / pass | peak -9.98 dB |  |
+| `arranger` | overtake | B | [chaolue/schwung-arranger](https://github.com/chaolue/schwung-arranger) `c76cae3` | MIT | `dsp.so` 71 KB | pass / pass / pass | silent | silent by design: song arranger overtake: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio |
+| `beatbank` | midi_fx | B | [mission-minnow/beatbank](https://github.com/mission-minnow/beatbank) `7d1b57f` | MIT | `dsp.so` 11 KB | pass / pass / pass | 14 notes out |  |
+| `belt-in` | sound_generator | B | [timncox/schwung-belt](https://github.com/timncox/schwung-belt) `febf1a4` | MIT | `dsp.so` 18 KB | pass / pass / pass | peak -0.07 dB |  |
+| `belt` | audio_fx | B | [timncox/schwung-belt](https://github.com/timncox/schwung-belt) `febf1a4` | MIT | `belt.so` 18 KB | pass / pass / pass | peak -0.07 dB, wet-dry -8.22 |  |
+| `bouba-kiki` | sound_generator | A | [charlesvestal/schwung-bouba-kiki](https://github.com/charlesvestal/schwung-bouba-kiki) `2c2ee4b` | MIT | `dsp.so` 26 KB | pass / pass / pass | peak -0.09 dB |  |
+| `braids` | sound_generator | A | [charlesvestal/schwung-braids](https://github.com/charlesvestal/schwung-braids) `5920d30` | MIT | `dsp.so` 110 KB | pass / pass / pass | peak -7.15 dB |  |
+| `busdriver` | audio_fx | A | [legsmechanical/schwung-busdriver](https://github.com/legsmechanical/schwung-busdriver) `36b6788` | MIT | `busdriver.so` 25 KB | pass / pass / pass | peak -1.1 dB, wet-dry -14.94 |  |
+| `capicola` | audio_fx | B | [charlesvestal/schwung-capicola](https://github.com/charlesvestal/schwung-capicola) `ab8b72d` | AGPL-3.0 | `capicola.so` 26 KB | pass / pass / pass | peak -3.15 dB, wet-dry -6.79 |  |
+| `chiptune` | sound_generator | A | [charlesvestal/schwung-chiptune](https://github.com/charlesvestal/schwung-chiptune) `f792807` | MIT | `dsp.so` 44 KB | pass / pass / pass | peak -15.69 dB |  |
+| `chonk` | sound_generator | A | [legsmechanical/schwung-chonk](https://github.com/legsmechanical/schwung-chonk) `da41ad0` | GPL-3.0 | `dsp.so` 39 KB | pass / pass / pass | peak -8.09 dB |  |
+| `chord-finder` | tool | B | [lukeco11/chord-finder-for-move](https://github.com/lukeco11/chord-finder-for-move) `484a029` | MIT | `dsp.so` 8 KB | pass / pass / pass | silent | silent by design: chord tool: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio |
+| `chorddex` | tool | B | [dony01001/ChordDex](https://github.com/dony01001/ChordDex) `5e25dad` | MIT | `dsp.so` 1 KB | pass / pass / pass | silent | silent by design: MIDI monitor: no audio output |
+| `chordism` | sound_generator | A | [charlesvestal/schwung-chordism](https://github.com/charlesvestal/schwung-chordism) `2a65614` | MIT | `dsp.so` 84 KB | pass / pass / pass | peak -8.9 dB |  |
+| `chowtape` | audio_fx | A | [charlesvestal/schwung-chowtape](https://github.com/charlesvestal/schwung-chowtape) `8a2a6d0` | GPL-3.0 | `chowtape.so` 14 KB | pass / pass / pass | peak -2.16 dB, wet-dry -25.04 |  |
+| `clap` | audio_fx | C | [charlesvestal/schwung-airwindows](https://github.com/charlesvestal/schwung-airwindows) `91a004f` | MIT | `clap.so` 47 KB | pass / pass / pass | peak -4.18 dB, wet-dry -20.37 |  |
+| `clementine-xt` | sound_generator | B | [sd88me/schwung-clementineXT](https://github.com/sd88me/schwung-clementineXT) `6577e1f` | GPL-3.0 | `dsp.so` 177 KB | pass / pass / pass | peak -10.38 dB |  |
+| `cloudseed` | audio_fx | A | [charlesvestal/schwung-cloudseed](https://github.com/charlesvestal/schwung-cloudseed) `fdbc24b` | MIT | `cloudseed.so` 17 KB | pass / pass / pass | peak -2.75 dB, wet-dry -16.51 |  |
+| `cw78` | sound_generator | A | [athousanddetails/schwung-cw-78](https://github.com/athousanddetails/schwung-cw-78) `e4b529e` | GPL-3.0 | `dsp.so` 67 KB | pass / pass / pass | peak -7.66 dB |  |
+| `davebox` | tool | B | [legsmechanical/schwung-davebox](https://github.com/legsmechanical/schwung-davebox) `2883827` | MIT | `dsp.so` 323 KB | pass / pass / pass | silent | silent audio, sent 2048 MIDI msgs to host |
+| `denis` | sound_generator | B | [filliformes/denis-move](https://github.com/filliformes/denis-move) `da7fb7f` | MIT | `dsp.so` 33 KB | pass / pass / pass | peak -11.78 dB |  |
+| `dexed` | sound_generator | A | [charlesvestal/schwung-dx7](https://github.com/charlesvestal/schwung-dx7) `07f7fed` | GPL-3.0 | `dsp.so` 56 KB | pass / pass / pass | peak -15.24 dB |  |
+| `dissolver` | audio_fx | A | [filliformes/dissolver-move](https://github.com/filliformes/dissolver-move) `0edff5f` | GPL-3.0 | `dissolver.so` 24 KB | pass / pass / pass | peak -9.84 dB, wet-dry -11.85 |  |
+| `dr32` | sound_generator | C | [legsmechanical/schwung-dr32](https://github.com/legsmechanical/schwung-dr32) `313086b` | GPL-3.0 | `dsp.so` 477 KB | pass / pass / pass | silent | silent by design: loads; needs a drum kit (Move factory .ablpreset kits are not redistributable) |
+| `dragonfly-hall` | audio_fx | B | [wolfrenegade1976/move-anything-dragonfly-hall](https://github.com/wolfrenegade1976/move-anything-dragonfly-hall) `4ab76d0` | GPL-3.0 | `dragonfly-hall.so` 53 KB | pass / pass / pass | peak -4.42 dB, wet-dry -22.81 |  |
+| `drums-practice` | tool | B | [graebe/schwung-drums-practice](https://github.com/graebe/schwung-drums-practice) `6249306` | GPL-3.0 | `dsp.so` 11 KB | pass / pass / pass | peak -10.93 dB |  |
+| `ducker` | audio_fx | A | [charlesvestal/schwung-ducker](https://github.com/charlesvestal/schwung-ducker) `0f1c932` | MIT | `ducker.so` 7 KB | pass / pass / pass | peak -6.23 dB, wet-dry -20.98 |  |
+| `essaim` | sound_generator | A | [filliformes/essaim-move](https://github.com/filliformes/essaim-move) `22f63b7` | MIT | `dsp.so` 33 KB | pass / pass / pass | peak -16.66 dB |  |
+| `eucalypso` | midi_fx | A | [handcraftedcc/move-everything-eucalypso](https://github.com/handcraftedcc/move-everything-eucalypso) `f0ff525` | MIT | `dsp.so` 23 KB | pass / pass / pass | 3 notes out |  |
+| `fizzik` | sound_generator | A | [filliformes/fizzik-move](https://github.com/filliformes/fizzik-move) `1af291e` | MIT | `dsp.so` 55 KB | pass / pass / pass | peak -10.75 dB |  |
+| `forge` | sound_generator | B | [filliformes/forge-move](https://github.com/filliformes/forge-move) `fc69e18` | MIT | `dsp.so` 154 KB | pass / pass / pass | peak -6.59 dB |  |
+| `fork` | midi_fx | B | [andree182/schwung-fork](https://github.com/andree182/schwung-fork) `181d332` | GPL-3.0 | `dsp.so` 12 KB | pass / pass / pass | 9 notes out |  |
+| `freak` | sound_generator | A | [handcraftedcc/move-everything-mrhyde](https://github.com/handcraftedcc/move-everything-mrhyde) `3c47f35` | MIT | `dsp.so` 216 KB | pass / pass / pass | peak -6.19 dB |  |
+| `gate` | audio_fx | A | [charlesvestal/schwung-gate](https://github.com/charlesvestal/schwung-gate) `49bc5a5` | MIT | `gate.so` 5 KB | pass / pass / pass | peak -6.23 dB, wet-dry -40.63 |  |
+| `granular` | audio_fx | A | [filliformes/boris-move](https://github.com/filliformes/boris-move) `2f8f61c` | GPL-3.0 | `granular.so` 17 KB | pass / pass / pass | peak -5.51 dB, wet-dry -23.47 |  |
+| `groovebank` | midi_fx | A | [mission-minnow/groovebank](https://github.com/mission-minnow/groovebank) `4edfa2f` | MIT | `dsp.so` 13 KB | pass / pass / pass | 7 notes out |  |
+| `guitar-tuner` | tool | B | [eightfour-dev/schwung-guitar-tuner](https://github.com/eightfour-dev/schwung-guitar-tuner) `343a097` | MIT | `dsp.so` 2 KB | pass / pass / pass | silent | silent by design: pitch analyser: render_block always writes silence (documented in guitar_tuner.c); results are read via get_param |
+| `hera` | sound_generator | A | [charlesvestal/schwung-hera](https://github.com/charlesvestal/schwung-hera) `7bcf8b8` | GPL-3.0 | `dsp.so` 35 KB | pass / pass / pass | peak -21.09 dB |  |
+| `hush1` | sound_generator | A | [charlesvestal/schwung-hush1](https://github.com/charlesvestal/schwung-hush1) `598ab90` | MIT | `dsp.so` 35 KB | pass / pass / pass | peak -10.23 dB |  |
+| `junologue-chorus` | audio_fx | A | [charlesvestal/schwung-junologue-chorus](https://github.com/charlesvestal/schwung-junologue-chorus) `0b1ecd9` | MIT | `junologue-chorus.so` 4 KB | pass / pass / pass | peak -3.64 dB, wet-dry -12.67 |  |
+| `keydetect` | audio_fx | B | [charlesvestal/schwung-keydetect](https://github.com/charlesvestal/schwung-keydetect) `66b6130` | MIT | `keydetect.so` 634 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `krautdrums` | sound_generator | A | [filliformes/krautdrums-move](https://github.com/filliformes/krautdrums-move) `c359afe` | MIT | `dsp.so` 41 KB | pass / pass / pass | peak -11.4 dB |  |
+| `magneto` | audio_fx | B | [filliformes/magneto-move](https://github.com/filliformes/magneto-move) `4305a8f` | MIT | `magneto.so` 30 KB | pass / pass / pass | peak -3.86 dB, wet-dry -15.64 |  |
+| `mark` | overtake | B | [timncox/schwung-mark](https://github.com/timncox/schwung-mark) `a9470f3` | MIT | `dsp.so` 42 KB | pass / pass / pass | peak -6.23 dB |  |
+| `maze-voice` | sound_generator | A | [sd88me/schwung-maze](https://github.com/sd88me/schwung-maze) `e774a67` | MIT | `dsp.so` 14 KB | pass / pass / pass | peak -4 dB |  |
+| `maze_seq` | tool | B | [sd88me/schwung-maze](https://github.com/sd88me/schwung-maze) `e774a67` | MIT | `dsp.so` 9 KB | pass / pass / pass | silent | silent audio, sent 40 MIDI msgs to host |
+| `maze_seq_lite` | midi_fx | B | [sd88me/schwung-maze](https://github.com/sd88me/schwung-maze) `e774a67` | MIT | `dsp.so` 5 KB | pass / pass / pass | 16 notes out |  |
+| `midi-player` | midi_fx | B | [charlesvestal/schwung-midi-player](https://github.com/charlesvestal/schwung-midi-player) `4c19bcf` | MIT | `dsp.so` 7 KB | pass / pass / pass | 18 notes out |  |
+| `midiverb` | audio_fx | B | [charlesvestal/schwung-midiverb](https://github.com/charlesvestal/schwung-midiverb) `ae0e91b` | GPL-3.0-or-later | `midiverb.so` 307 KB | pass / pass / pass | peak -6.36 dB, wet-dry -19.15 |  |
+| `monksynth` | sound_generator | B | [charlesvestal/schwung-monksynth](https://github.com/charlesvestal/schwung-monksynth) `38649a6` | MIT | `dsp.so` 21 KB | pass / pass / pass | peak -5.09 dB |  |
+| `mono-voice` | sound_generator | A | [timncox/schwung-mono](https://github.com/timncox/schwung-mono) `ce37774` | MIT | `dsp.so` 76 KB | pass / pass / pass | peak -3.62 dB |  |
+| `mono` | overtake | B | [timncox/schwung-mono](https://github.com/timncox/schwung-mono) `ce37774` | MIT | `dsp.so` 76 KB | pass / pass / pass | peak -8.76 dB |  |
+| `moog` | sound_generator | A | [charlesvestal/schwung-moog](https://github.com/charlesvestal/schwung-moog) `4f1f658` | MIT | `dsp.so` 14 KB | pass / pass / pass | peak -10.96 dB |  |
+| `mrdrums` | sound_generator | B | [handcraftedcc/move-everything-mrdrums](https://github.com/handcraftedcc/move-everything-mrdrums) `609630e` | MIT | `dsp.so` 44 KB | pass / pass / pass | peak -4.84 dB |  |
+| `mrsample` | sound_generator | B | [charlesvestal/schwung-mrsample](https://github.com/charlesvestal/schwung-mrsample) `44ffb2d` | MIT | `dsp.so` 101 KB | pass / pass / pass | peak -0.45 dB |  |
+| `munchi-delay` | audio_fx | B | [charlesvestal/schwung-munchi-delay](https://github.com/charlesvestal/schwung-munchi-delay) `37ec685` | MIT | `munchi-delay.so` 14 KB | pass / pass / pass | peak -6.23 dB, wet-dry -16.78 |  |
+| `mverb` | audio_fx | A | [charlesvestal/schwung-mverb](https://github.com/charlesvestal/schwung-mverb) `edb2cba` | GPL-3.0 | `mverb.so` 14 KB | pass / pass / pass | peak -6 dB, wet-dry -20.34 |  |
+| `nam` | audio_fx | C | [charlesvestal/schwung-nam](https://github.com/charlesvestal/schwung-nam) `da4af3f` | MIT | `nam.so` 452 KB | pass / pass / pass | peak -21.29 dB, wet-dry -17.05 |  |
+| `noisemaker` | sound_generator | A | [legsmechanical/schwung-noisemaker](https://github.com/legsmechanical/schwung-noisemaker) `543fc70` | GPL-2.0 | `dsp.so` 259 KB | pass / pass / pass | peak -11.08 dB |  |
+| `nusaw` | sound_generator | A | [charlesvestal/schwung-nusaw](https://github.com/charlesvestal/schwung-nusaw) `e378773` | MIT | `dsp.so` 17 KB | pass / pass / pass | peak -5.57 dB |  |
+| `obxd` | sound_generator | A | [charlesvestal/schwung-obxd](https://github.com/charlesvestal/schwung-obxd) `f02973f` | GPL-3.0 | `dsp.so` 116 KB | pass / pass / pass | peak -7.85 dB |  |
+| `oktonik` | tool | B | [skerryvibe/oktonik](https://github.com/skerryvibe/oktonik) `cfb4660` | MIT | `dsp.so` 26 KB | pass / pass / pass | silent | silent by design: chord/bass performance tool: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio |
+| `ottx` | audio_fx | A | [legsmechanical/schwung-ottx](https://github.com/legsmechanical/schwung-ottx) `8035c5e` | GPL-3.0 | `ottx.so` 17 KB | pass / pass / pass | peak -0.23 dB, wet-dry -6.62 |  |
+| `oversmack` | overtake | B | [timncox/schwung-smack](https://github.com/timncox/schwung-smack) `c018eca` | MIT | `dsp.so` 33 KB | pass / pass / pass | peak -6.23 dB |  |
+| `palette` | audio_fx | A | [filliformes/palette-move](https://github.com/filliformes/palette-move) `7a5a142` | MIT | `palette.so` 69 KB | pass / pass / pass | peak -2.34 dB, wet-dry -36.34 |  |
+| `piano-practice` | tool | B | [graebe/schwung-piano-practice](https://github.com/graebe/schwung-piano-practice) `4aa0998` | GPL-3.0 | `dsp.so` 16 KB | pass / pass / pass | peak -6.82 dB |  |
+| `pixel-walkers` | midi_fx | A | [mestela/schwung-pixel-walkers](https://github.com/mestela/schwung-pixel-walkers) `5bc3df9` | MIT | `dsp.so` 9 KB | pass / pass / pass | 24 notes out |  |
+| `plaits` | sound_generator | A | [j3threejay/move-anything-plaits](https://github.com/j3threejay/move-anything-plaits) `6d2ab08` | MIT | `dsp.so` 197 KB | pass / pass / pass | peak -9.61 dB |  |
+| `psxverb` | audio_fx | A | [charlesvestal/schwung-psxverb](https://github.com/charlesvestal/schwung-psxverb) `c8cc042` | MIT | `psxverb.so` 8 KB | pass / pass / pass | peak -4.89 dB, wet-dry -20.13 |  |
+| `punchfx` | audio_fx | B | [filliformes/punchfx-move](https://github.com/filliformes/punchfx-move) `7b9604a` | MIT | `punchfx.so` 10 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `rex` | sound_generator | B | [charlesvestal/schwung-rex](https://github.com/charlesvestal/schwung-rex) `c46ed64` | MIT | `dsp.so` 17 KB | pass / pass / pass | peak 0 dB |  |
+| `rrverb10` | audio_fx | B | [legsmechanical/schwung-rrverb10](https://github.com/legsmechanical/schwung-rrverb10) `a8cbbb9` | LGPL-2.1 | `rrverb10.so` 7 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `ruminant` | audio_fx | A | [mestela/schwung-ruminant](https://github.com/mestela/schwung-ruminant) `d6cdedc` | MIT | `ruminant.so` 6 KB | pass / pass / pass | peak -4.94 dB, wet-dry -14.51 |  |
+| `samplerobot` | tool | B | [charlesvestal/schwung-autosample](https://github.com/charlesvestal/schwung-autosample) `7f8fbd8` | MIT | `dsp.so` 20 KB | pass / pass / pass | peak -6.23 dB |  |
+| `scratch` | sound_generator | B | [mestela/schwung-scratch](https://github.com/mestela/schwung-scratch) `9be303b` | GPL-3.0-or-later | `dsp.so` 20 KB | pass / pass / pass | peak -0.8 dB |  |
+| `setbfree-organ` | sound_generator | B | [pdubucq/schwung-setbfree](https://github.com/pdubucq/schwung-setbfree) `53834bd` | GPL-2.0 | `dsp.so` 102 KB | pass / pass / pass | peak 0 dB |  |
+| `sf2` | sound_generator | B | [charlesvestal/schwung-sf2](https://github.com/charlesvestal/schwung-sf2) `825cf31` | LGPL-2.1 | `dsp.so` 80 KB | pass / pass / pass | peak -2.65 dB |  |
+| `signal` | sound_generator | A | [filliformes/signal-move](https://github.com/filliformes/signal-move) `77b6a88` | GPL-3.0 | `dsp.so` 88 KB | pass / pass / pass | peak -17.07 dB |  |
+| `simian` | sound_generator | A | [legsmechanical/schwung-simian](https://github.com/legsmechanical/schwung-simian) `647c2bb` | GPL-3.0 | `dsp.so` 111 KB | pass / pass / pass | peak -6.22 dB |  |
+| `smack-in` | sound_generator | B | [timncox/schwung-smack](https://github.com/timncox/schwung-smack) `c018eca` | MIT | `dsp.so` 33 KB | pass / pass / pass | peak -6.23 dB |  |
+| `smack` | audio_fx | B | [timncox/schwung-smack](https://github.com/timncox/schwung-smack) `c018eca` | MIT | `smack.so` 33 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `sophie` | sound_generator | A | [mestela/schwung-sophie](https://github.com/mestela/schwung-sophie) `abd132d` | MIT | `dsp.so` 20 KB | pass / pass / pass | peak -8.81 dB |  |
+| `spectra` | audio_fx | A | [filliformes/spectra-move](https://github.com/filliformes/spectra-move) `c631fff` | MIT | `spectra.so` 31 KB | pass / pass / pass | peak 0 dB, wet-dry -12.41 |  |
+| `stereoid` | audio_fx | A | [legsmechanical/schwung-stereoid](https://github.com/legsmechanical/schwung-stereoid) `7efecf1` | MIT | `stereoid.so` 10 KB | pass / pass / pass | peak -1.49 dB, wet-dry -22.64 |  |
+| `structor` | audio_fx | A | [filliformes/structor-move](https://github.com/filliformes/structor-move) `db3595e` | MIT | `structor.so` 40 KB | pass / pass / pass | peak -2.21 dB, wet-dry -12.53 |  |
+| `superarp` | midi_fx | A | [handcraftedcc/move-everything-superarp](https://github.com/handcraftedcc/move-everything-superarp) `6eefd02` | MIT | `dsp.so` 26 KB | pass / pass / pass | 13 notes out |  |
+| `tablor` | sound_generator | B | [athousanddetails/schwung-tablor](https://github.com/athousanddetails/schwung-tablor) `0662122` | BSD-3-Clause | `dsp.so` 163 KB | pass / pass / pass | peak -3.43 dB |  |
+| `tape-echo2` | audio_fx | A | [athousanddetails/schwung-tape-echo2](https://github.com/athousanddetails/schwung-tape-echo2) `da2e6b5` | GPL-3.0 | `tape-echo2.so` 51 KB | pass / pass / pass | peak -0.46 dB, wet-dry -17.4 |  |
+| `tapedelay` | audio_fx | A | [charlesvestal/schwung-space-delay](https://github.com/charlesvestal/schwung-space-delay) `87e0cbf` | MIT | `tapedelay.so` 7 KB | pass / pass / pass | peak -4.3 dB, wet-dry -18.2 |  |
+| `tapescam` | audio_fx | A | [charlesvestal/schwung-tapescam](https://github.com/charlesvestal/schwung-tapescam) `e9ab1ae` | MIT | `tapescam.so` 17 KB | pass / pass / pass | peak -2.82 dB, wet-dry -11.86 |  |
+| `tb3po` | tool | B | [charlesvestal/schwung-tb3po](https://github.com/charlesvestal/schwung-tb3po) `f49d81d` | GPL-3.0 | `dsp.so` 16 KB | pass / pass / pass | silent | silent audio, sent 60 MIDI msgs to host |
+| `trance-gate` | audio_fx | B | [graebe/neon-ingvy-audio-plugins](https://github.com/graebe/neon-ingvy-audio-plugins) `0188772` | GPL-3.0 | `trance-gate.so` 187 KB | pass / pass / pass | peak -6.23 dB, wet-dry -15.73 |  |
+| `tuner` | tool | B | [CatsAreCool710/Move-Everything-Tuner](https://github.com/CatsAreCool710/Move-Everything-Tuner) `b8b8d6b` | GPL-3.0 | `dsp.so` 25 KB | pass / pass / pass | peak -7.96 dB |  |
+| `usefulity` | audio_fx | A | [charlesvestal/schwung-usefulity](https://github.com/charlesvestal/schwung-usefulity) `5bb2f00` | MIT | `usefulity.so` 7 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `verglas` | audio_fx | A | [filliformes/verglas-move](https://github.com/filliformes/verglas-move) `4c159d8` | MIT | `verglas.so` 90 KB | pass / pass / pass | peak -6.78 dB, wet-dry -16.17 |  |
+| `vocoder` | audio_fx | A | [charlesvestal/schwung-vocoder](https://github.com/charlesvestal/schwung-vocoder) `261ce6a` | MIT | `vocoder.so` 7 KB | pass / pass / pass | peak 0 dB, wet-dry -5.17 | 48% of samples at full scale |
+| `war_bells` | audio_fx | A | [seajaysec/war-bells](https://github.com/seajaysec/war-bells) `bd13e89` | AGPL-3.0 | `war_bells.so` 64 KB | pass / pass / pass | peak -6.57 dB, wet-dry -19.79 |  |
+| `waveform-editor` | tool | B | [charlesvestal/schwung-waveform-editor](https://github.com/charlesvestal/schwung-waveform-editor) `7d53b8e` | MIT | `dsp.so` 36 KB | pass / pass / pass | silent | silent by design: audio file editor: plays audio only after the UI loads a file from the VFS |
+| `work` | audio_fx | B | [timncox/schwung-work](https://github.com/timncox/schwung-work) `c88ec15` | MIT | `work.so` 91 KB | pass / pass / pass | peak -6.23 dB, wet-dry -999 | output == input (pass-through at defaults) |
+| `wurl` | sound_generator | A | [filliformes/wurl-move](https://github.com/filliformes/wurl-move) `2d5b77d` | GPL-3.0 | `dsp.so` 26 KB | pass / pass / pass | peak -10.25 dB |  |
+
+### Recipes present but not built (`"skip": true`)
+
+| id | class | repo | licence | reason |
+|---|---|---|---|---|
+| `helm` | C | [andree182/schwung-helm](https://github.com/andree182/schwung-helm) | GPL-3.0 | Compiles (1.8 MB side module) but dlopen fails: JUCE 8.0.10's JUCE_WASM target has no native implementations for 59 juce_core/juce_events symbols helm links (DirectoryIterator::NativeIterator, File::getSpecialLocation, Thread::createNativeThread, MessageManager platform hooks, sockets/WebInputStream/NamedPipe/ChildProcess). Next step: compile JUCE as JUCE_LINUX with stub headers for sys/prctl.h, sys/ptrace.h, sys/timerfd.h, sys/sysinfo.h (POSIX natives mostly work on Emscripten), or add a small wasm natives file (dir iteration + pthread thread + no-op message queue). Realistic with ~half a day. |
+| `osirus` | C | [charlesvestal/schwung-virus](https://github.com/charlesvestal/schwung-virus) | GPL-3.0 | Gearmulator DSP56300 emulator: JIT (asmjit) only for x86_64/arm64. The interpreter fallback would compile for wasm but is far from realtime for Virus firmware (the JIT is already near the limit on the Move's CM4). Also needs a user-supplied Virus ROM, plus threads/mmap. Not realistic. |
+| `performance-fx` | C | [charlesvestal/schwung-performance-fx](https://github.com/charlesvestal/schwung-performance-fx) | MIT | Overtake built on Bungee, Eigen and FFTW-like code (about 2000 source files, 31 std::thread sites, 35 try blocks). Needs the overtake UI host plus probably -fwasm-exceptions (like surge). Realistic with significant work. |
+| `sfz` | C | [charlesvestal/schwung-sfz](https://github.com/charlesvestal/schwung-sfz) | MIT | Shipping build is the Rust xsynth shim (cargo +nightly, staticlib) linked into dsp.so; sfizz is a legacy path. Needs a Rust nightly toolchain with -Zbuild-std for wasm32-unknown-emscripten, relocation-model=pic and +atomics,+bulk-memory to match the pthreads main module; not available in the emsdk image. Realistic with work (custom Docker image: emsdk + rustup nightly). Sample libraries need a VFS/upload flow. |
+| `stems` | C | [charlesvestal/schwung-stems](https://github.com/charlesvestal/schwung-stems) | MIT | Tool: SpleeterRT neural stem separation, offline over whole files (large models, heavy CPU, long-running). Technically compilable C, but offline neural processing of full tracks in a browser worker is impractical next to realtime audio. Low priority. |
+| `stretch` | C | [charlesvestal/schwung-stretch](https://github.com/charlesvestal/schwung-stretch) | MIT | Tool (needs the QuickJS UI host). DSP is Bungee (C++ plus Eigen, submodule), offline file time-stretching; a prebuilt dsp.so is committed. Bungee itself is portable C++, so this is realistic with work (CMake pre_build like nam), but it is file-centric and low value until tools run in the engine. |
+| `surge` | C | [charlesvestal/schwung-surge](https://github.com/charlesvestal/schwung-surge) | GPL-3.0 | Builds (7.5 MB + 40 MB surge-data) and plays in an EH-enabled host, but needs C++ exceptions (-fwasm-exceptions) in the module AND the main module. In a no-EH engine its dlopen fails and leaves half-registered exports in Emscripten's global symbol table, which breaks every later dlopen in the process, so it must not be staged until the engine is built with -fwasm-exceptions. Set skip:false to build. |
 <!-- /TABLE -->
 
-All 57 recipes were rebuilt from a clean `build/module-src` straight from GitHub
-(no mirror) in about 2 min 10 s on an M-series Mac, and all pass both test
-modes. Two have warnings, not failures:
-- `usefulity` is bit-exact pass-through at its defaults. It is a utility.
-- `vocoder` puts 48% of its samples at full scale. The test feeds the same saw
-  as both carrier and modulator (the modulator is read from the audio-in
-  mailbox), and the default 2x gains make it clip.
+### Notable per-module workarounds
+- **Rust (trance-gate, drums-practice, piano-practice):** `pre_build` installs
+  a pinned nightly (`nightly-2026-09-01` + `rust-src`) into
+  `build/rust-toolchain`, inside the emsdk container. It builds a `staticlib`
+  for `wasm32-unknown-emscripten` with `-Zbuild-std`,
+  `+atomics,+bulk-memory,+mutable-globals` and `relocation-model=pic`, which
+  emcc links `--whole-archive`. It takes about 15 to 60 s per crate, and the
+  cached toolchain is 1.7 GB.
+- **Bigger libraries:**
+  - keydetect builds FFTW 3.3.10 (sha256-pinned tarball) and libkeyfinder.
+  - nam builds NeuralAudio and RTNeural.
+  - dragonfly-hall pins dragonfly-reverb with submodules.
+  - clap rebuilds airwin2rack as a second side module,
+    `plugins/Airwindows.clap`, because the committed one is an aarch64 ELF.
+  - All of these deps are compiled `-fvisibility=hidden`.
+- **Worker-thread loaders:** these need `test.wait_ms` or `test.realtime` to
+  become audible in the faster-than-real-time test: clementine-xt,
+  setbfree-organ, munchi-delay, tablor, scratch and nam. In the engine they
+  run in real time.
+- **Demo content:** generated, CC0, by `modules/demo/gen_demo_*.py` at build
+  time:
+  - drum, keys and pad WAVs in
+    `/data/UserData/UserLibrary/Samples/schwung-wasm-demo/` (mrsample, mrdrums)
+  - a `.sf2` (sf2)
+  - a `.mid` (midi-player)
+  - an `.rx2` encoded with rex's own encoder
 
-Recipe workarounds worth knowing:
-- `chiptune` renames gb_snd_emu's `Blip_*` classes with `-D` on those files,
-  because upstream relies on `objcopy --localize-hidden` and wasm-ld has no
-  equivalent.
-- `moog` compiles a `.c` file as C++, as upstream does.
-- `dissolver` builds with `-DPFFFT_SIMD_DISABLE`.
+  Repo-shipped content is used under its module's licence: tablor wavetables,
+  the scratch sample, beatbank patterns, nam models (12 MB, GPL-3.0).
+- **Audio-in modules** (belt-in, smack-in) are tested with
+  `test.audio_in: true`. In the engine the mailbox audio-in is silent until
+  mic input is wired.
+- **shm modules** (aphex, denis, punchfx): `shm_open` fails in the browser and
+  each module falls back gracefully; no patch. Shift and selected-slot features
+  degrade.
+- **Expected warnings:**
+  - usefulity, keydetect and samplerobot leave the signal unchanged; they
+    are utilities or analysers.
+  - smack, work and rrverb10 also leave it unchanged. smack and work need a
+    capture trigger, and rrverb10 needs a user ROM.
+  - vocoder clips, because its carrier and modulator are the same saw.
+- **Silent by design** (the test passes on loading, or on MIDI the module
+  sends to the host): the MIDI-only tools and overtakes (tb3po, maze_seq,
+  arranger, chord-finder, oktonik, davebox), the analysers and editors
+  (chorddex, guitar-tuner, waveform-editor), and dr32, which needs a Move
+  factory kit.
 
 ## What is not built, and why
 
-**Class A, but the licence blocks redistribution.** None of these was built.
-- No licence (all rights reserved): `branchage`, `filter`, `velocity_scale`,
-  `euclidrum`, `genera`, `superboom`, `tinyk`, `omega`, `pushnpull`,
-  `impressive-chords`. Ask the authors for a licence; a recipe is about 15
-  lines each.
-- Also unlicensed (classes B to D): `hank`, `weird-dreams`, `granny`,
-  `slicer`, `elusive-muse`, `forgetful`, `wayward`, `breakbeat`, `po32-drum`,
-  `acid`, `jp8000`, `loopex`, `twinsampler`, and others. See
-  `docs/MODULE-SURVEY.md`.
-- PolyForm Strict, which forbids derivatives: `quilt`, `strut`.
-- Non-commercial: `minijv` (MAME-style), `m8`, `dj` (CC-BY-NC-SA).
+**Licence: not redistributable, so no recipe.**
+- No licence:
+  - class A: `branchage`, `filter`, `velocity_scale`, `euclidrum`,
+    `genera`, `superboom`, `tinyk`, `omega`, `pushnpull`,
+    `impressive-chords`
+  - class B: `hank`, `weird-dreams`, `granny`, `slicer`, `elusive-muse`,
+    `forgetful`, `wayward`, `breakbeat`, `po32-drum`, `acid`
+  - class C/D: `jp8000`, `loopex`, `twinsampler`, `dronage-tool`,
+    `overwork-mix`
+- PolyForm Strict: `quilt`, `strut`.
+- Non-commercial: `minijv`, `dj`, `m8`.
 
-**Class B (needs work beyond a recipe).**
-- Worker threads in DSP: `capicola`, `monksynth`, `munchi-delay`, `forge`,
-  `magneto`, `clementine-xt`, `setbfree-organ`, `maze_seq*`, `fork`. Wasm
-  pthreads work in the test host, so many of these may simply build. They need
-  testing with the engine's worker pool size and with the "spinning audio
-  thread" caveat above.
-- Sample, ROM or user-file payloads that need a fetch-to-VFS or upload flow:
-  `mrsample`, `mrdrums`, `rex`, `sf2` (FluidLite), `midi-player`, `tablor`,
-  `scratch`, `beatbank`. ROM-based: `midiverb`, `rrverb10`.
-- `/dev/shm` access to shadow-control: `aphex`, `denis`, `punchfx`. This needs
-  a stub patch per module.
-- Audio-in through `mapped_memory`: `belt`, `belt-in`, `smack`, `smack-in`,
-  `work`. These should work, since the mailbox exists and the test host fills
-  audio-in, but they are untested.
-- Big library builds: `keydetect` (libkeyfinder + FFTW), `dragonfly-hall`
-  (freeverb3 fetched at build time), `trance-gate` (Rust crate, needs
-  `cargo --target wasm32-unknown-emscripten`).
-- Tools and overtakes: they also need the engine's QuickJS UI host. Their DSP
-  side would follow the same recipe format.
+**Class C, evaluated** (skip recipes with the reasons are listed above):
+- **surge:** builds, and plays 675 patches with an EH-enabled host. It needs
+  `-fwasm-exceptions` engine-wide.
+- **helm:** JUCE 8's wasm target leaves 59 native functions undefined. Two
+  patches are kept for whoever continues; about half a day of work.
+- **sfz:** needs the Rust xsynth shim. That is now feasible with the Rust
+  recipe pattern above.
+- **osirus:** not realistic. The DSP56300 JIT is x86/arm64 only, and the
+  interpreter is too slow.
+- **stretch, stems, performance-fx:** not attempted. Large codebases and/or
+  offline processing, and they need the tool/overtake UI host.
+- **Built and passing:** clap (Airwindows, 49 KB host plus a 5.9 MB `.clap`),
+  nam (860 KB plus models), and dr32 (loads, needs a kit).
+- **Not attempted:** `movy` (a Rust engine that itself hosts modules via
+  dlopen) and `kit-builder` (needs the Move sample library).
 
-**Class C and D.** These are JIT or ROM emulators (`osirus`, `jp8000`,
-`minijv`), a CLAP host that dlopens `.clap` files (`clap`/airwindows), neural
-models (`nam`, `stems`), huge codebases (`surge`, `helm`, `sfz`, `dr32`,
-`performance-fx`), network streamers, and release-only repos. They are out of
-scope for this pipeline as-is.
+**Class D:** network streamers (`airplay`, `radiogarden`, `webstream`,
+`streamrtsp`) can't work in a browser sandbox. `overwork` and `work-in` are
+distribution-only repos whose source is `schwung-work`; they could become
+recipes pointing at that repo.
+
+**Class J (JS-only):** `sidcontrol` and `snake` (MIT) have no DSP. They only
+need their files staged, which would need a no-`.so` recipe mode. That mode
+does not exist yet.

@@ -22,8 +22,8 @@
     }
   ],
   "pre_build": [
-    "cd deps/fftw/fftw-3.3.10 && emconfigure ./configure --prefix=$OLDPWD/.wasm-deps --enable-static --disable-shared --disable-fortran --disable-doc --with-pic CFLAGS='-O2 -fPIC -pthread' > ../configure.log 2>&1 && emmake make -j8 > ../make.log 2>&1 && emmake make install > ../install.log 2>&1",
-    "emcmake cmake -S deps/libkeyfinder -B .wasm-deps/kf-build -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFFTW3_LIBRARY=$PWD/.wasm-deps/lib/libfftw3.a -DFFTW3_INCLUDE_DIR=$PWD/.wasm-deps/include -DCMAKE_INSTALL_PREFIX=$PWD/.wasm-deps -DCMAKE_C_FLAGS=\"-pthread -fPIC\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC\" > .wasm-deps/kf-cmake.log 2>&1 || { tail -30 .wasm-deps/kf-cmake.log; exit 1; }; cmake --build .wasm-deps/kf-build -j8 && cmake --install .wasm-deps/kf-build"
+    "cd deps/fftw/fftw-3.3.10 && emconfigure ./configure --prefix=$OLDPWD/.wasm-deps --enable-static --disable-shared --disable-fortran --disable-doc --with-pic CFLAGS='-fvisibility=hidden -fvisibility-inlines-hidden -O2 -fPIC -pthread' > ../configure.log 2>&1 && emmake make -j8 > ../make.log 2>&1 && emmake make install > ../install.log 2>&1",
+    "emcmake cmake -S deps/libkeyfinder -B .wasm-deps/kf-build -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFFTW3_LIBRARY=$PWD/.wasm-deps/lib/libfftw3.a -DFFTW3_INCLUDE_DIR=$PWD/.wasm-deps/include -DCMAKE_INSTALL_PREFIX=$PWD/.wasm-deps -DCMAKE_C_FLAGS=\"-fvisibility=hidden -fvisibility-inlines-hidden -pthread -fPIC\" -DCMAKE_CXX_FLAGS=\"-fvisibility=hidden -fvisibility-inlines-hidden -pthread -fPIC\" > .wasm-deps/kf-cmake.log 2>&1 || { tail -30 .wasm-deps/kf-cmake.log; exit 1; }; cmake --build .wasm-deps/kf-build -j8 && cmake --install .wasm-deps/kf-build"
   ],
   "sources": [
     "src/dsp/keyfinder_wrapper.cpp",
@@ -56,5 +56,6 @@
     }
   ],
   "so_name": "keydetect.so",
-  "upstream_build": "scripts/Dockerfile builds FFTW 3.3.10 (static, --with-pic) and libkeyfinder 2.2.8 (static, PIC) for aarch64; scripts/build.sh: g++ -Ofast -std=c++11 keyfinder_wrapper.cpp, gcc -Ofast keydetect.c, link -lkeyfinder -lfftw3 -static-libstdc++; dist/keydetect/{module.json,help.json,keydetect.so}"
+  "upstream_build": "scripts/Dockerfile builds FFTW 3.3.10 (static, --with-pic) and libkeyfinder 2.2.8 (static, PIC) for aarch64; scripts/build.sh: g++ -Ofast -std=c++11 keyfinder_wrapper.cpp, gcc -Ofast keydetect.c, link -lkeyfinder -lfftw3 -static-libstdc++; dist/keydetect/{module.json,help.json,keydetect.so}",
+  "wasm_notes": "Dependencies are built with -fvisibility=hidden(-inlines-hidden) so their symbols are not exported into the shared Emscripten namespace."
 }

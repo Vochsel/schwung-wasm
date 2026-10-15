@@ -190,6 +190,7 @@ async function powerOn() {
     started = true;
     $('openBtn').disabled = false;
     $('padsBtn').disabled = !Module._sw_set_pad_layout;
+    setupScaleControls();
     setInterval(pollTrack, 200);
     panel.setSource(views);
 
@@ -267,10 +268,28 @@ function pollTrack() {
   if (!Module?._sw_get_pad_layout) return;
   const t = Module._sw_get_track ? Module._sw_get_track() : 0;
   const l = Module._sw_get_pad_layout(t);
-  if (t === curTrack && l === curLayout) return;
-  curTrack = t; curLayout = l;
+  const sc = Module._sw_get_scale ? Module._sw_get_scale(t) : 0;
+  if (t === curTrack && l === curLayout && sc === curScale) return;
+  curTrack = t; curLayout = l; curScale = sc;
   $('padsBtn').textContent = `T${t + 1} pads: ${l ? 'Drums' : 'Notes'}`;
   $('padsBtn').classList.toggle('on', !!l);
+  // key / scale apply to melodic layouts only
+  $('keySel').value = String(sc & 0xff); $('scaleSel').value = String(sc >> 8);
+  $('keySel').disabled = $('scaleSel').disabled = !!l || !Module._sw_set_scale;
+}
+let curScale = -1;
+function setupScaleControls() {
+  if (!Module._sw_scale_count) { $('keySel').disabled = $('scaleSel').disabled = $('swing').disabled = true; return; }
+  const names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  $('keySel').innerHTML = names.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+  const n = Module._sw_scale_count();
+  $('scaleSel').innerHTML = Array.from({ length: n }, (_, i) => `<option value="${i}">${Module.UTF8ToString(Module._sw_scale_name(i))}</option>`).join('');
+  const apply = () => { Module._sw_set_scale(curTrack, Number($('keySel').value), Number($('scaleSel').value)); curScale = -1; pollTrack(); };
+  $('keySel').addEventListener('change', apply);
+  $('scaleSel').addEventListener('change', apply);
+  $('swing').disabled = false;
+  $('swing').value = String(Module._sw_get_swing());
+  $('swing').addEventListener('input', () => Module._sw_set_swing(Number($('swing').value) || 0));
 }
 $('padsBtn').addEventListener('click', () => {
   if (!Module?._sw_set_pad_layout || curTrack < 0) return;

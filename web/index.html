@@ -101,6 +101,8 @@
     <label class="t" title="Audio buffer: blocks the engine keeps queued (2.9 ms each)">Buffer <select id="buf">
       <option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="6">6</option><option value="8">8</option><option value="12">12</option></select></label>
     <label class="t" title="Tempo (sw_set_bpm)">BPM <input id="bpm" type="number" min="20" max="300" step="1" value="120"></label>
+    <label class="t" title="Key and scale of the current track's melodic pads (Virtual Move)">Key <select id="keySel" disabled></select><select id="scaleSel" disabled></select></label>
+    <label class="t" title="Swing: how late the off-beat 16ths play (0–60%)">Swing <input id="swing" type="number" min="0" max="60" step="5" value="0" disabled></label>
     <button class="t" id="clickBtn" type="button" disabled title="Metronome (Virtual Move)">Click</button>
     <button class="t" id="micBtn" type="button" disabled title="Feed your microphone / audio input into the Move's line-in (vocoders, line-in, samplers)">Mic</button>
     <button class="t" id="recBtn" type="button" disabled title="Record the output and download a WAV">Record WAV</button>
