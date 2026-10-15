@@ -1,0 +1,32 @@
+{
+  "id": "shape-walk-seq",
+  "repo": "mestela/schwung-shape-walk",
+  "commit": "827275f1ea0720fa4e1a60c32632466354397f4c",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/overtake/dsp/shape_walk_seq.c"
+  ],
+  "include": [],
+  "include_abs": [
+    "/w/build/schwung/src"
+  ],
+  "defines": [],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/overtake/module.json",
+    "src/overtake/ui.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "Makefile device: aarch64-linux-gnu-gcc -O2 -std=c11 -fPIC -shared -I$(SCHWUNG_ROOT)/src src/overtake/dsp/shape_walk_seq.c (which #includes ../../dsp/shape_walk.c) -o src/overtake/dsp.so; package: dist/shape-walk-seq/{module.json,ui.js,dsp.so}",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "overtake tool: chords come from its UI's pad handling and go to Move's track input, not the slot's audio"
+  }
+}

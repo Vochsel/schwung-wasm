@@ -1,0 +1,47 @@
+{
+  "id": "breakbeat",
+  "repo": "mestela/schwung-breakbeat",
+  "commit": "c6e5b94dad1c0c5644c6a68052ba110d6a5a2c85",
+  "license": "MIT",
+  "license_note": "No LICENSE file in the repo; src/module.json declares \"license\": \"MIT\" and the author asked for it to be included.",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/breakbeat.c",
+    "src/dsp/grain_stretch.c",
+    "src/dsp/slice_select.c",
+    "src/dsp/manual_slices.c",
+    "src/dsp/bb_timing.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=gnu11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    "src/status_view.js",
+    "src/slice_editor.js",
+    {
+      "from": "src/presets/*.json",
+      "to": "presets/"
+    },
+    "README.md",
+    {
+      "from": "samples/*.wav",
+      "to": "samples/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "demo_content": "23 bundled breaks (samples/*.wav, ~16 MB) staged in the module's samples/; breakbeat's own ensure_portal_exists() symlinks /data/UserData/breakbeat-samples/Built-in to them at load. The module dir is over HEAVY_MB, so it ships in extra.data.",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG -shared -fPIC -Isrc/dsp src/dsp/*.c -lpthread; dist/breakbeat/{dsp.so,module.json,ui.js,status_view.js,slice_editor.js,presets/,samples/*.wav}; install.sh symlinks /data/UserData/breakbeat-samples/Built-in -> module samples",
+  "test": {
+    "wait_ms": 3000
+  }
+}

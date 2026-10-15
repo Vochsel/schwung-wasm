@@ -292,7 +292,7 @@ content, and never ROMs.
 ## Built modules
 
 <!-- TABLE -->
-**106 modules built; 106/106 pass all three test modes** (default / `--threaded` / `--coload`). By survey class: A: 57, B: 46, C: 3.
+**109 modules built; 109/109 pass all three test modes** (default / `--threaded` / `--coload`). By survey class: A: 57, B: 47, C: 3, plus 2 published after the survey (`shape-walk`, `shape-walk-seq`).
 Results are in `build/module-test/results-{default,threaded,coload}.json`.
 
 | id | type | class | repo @ pin | licence | dsp | test (default / threaded / coload) | level | notes |
@@ -312,6 +312,7 @@ Results are in `build/module-test/results-{default,threaded,coload}.json`.
 | `braids` | sound_generator | A | [charlesvestal/schwung-braids](https://github.com/charlesvestal/schwung-braids) `5920d30` | MIT | `dsp.so` 110 KB | pass / pass / pass | peak -7.15 dB |  |
 | `busdriver` | audio_fx | A | [legsmechanical/schwung-busdriver](https://github.com/legsmechanical/schwung-busdriver) `36b6788` | MIT | `busdriver.so` 25 KB | pass / pass / pass | peak -1.1 dB, wet-dry -14.94 |  |
 | `capicola` | audio_fx | B | [charlesvestal/schwung-capicola](https://github.com/charlesvestal/schwung-capicola) `ab8b72d` | AGPL-3.0 | `capicola.so` 26 KB | pass / pass / pass | peak -3.15 dB, wet-dry -6.79 |  |
+| `breakbeat` | sound_generator | B | [mestela/schwung-breakbeat](https://github.com/mestela/schwung-breakbeat) `c6e5b94` | MIT (module.json) | `dsp.so` 60 KB | pass / pass / pass | peak -0.56 dB | no LICENSE file; `src/module.json` declares MIT and the author asked for it. 23 bundled breaks ride in extra.data |
 | `chiptune` | sound_generator | A | [charlesvestal/schwung-chiptune](https://github.com/charlesvestal/schwung-chiptune) `f792807` | MIT | `dsp.so` 44 KB | pass / pass / pass | peak -15.69 dB |  |
 | `chonk` | sound_generator | A | [legsmechanical/schwung-chonk](https://github.com/legsmechanical/schwung-chonk) `da41ad0` | GPL-3.0 | `dsp.so` 39 KB | pass / pass / pass | peak -8.09 dB |  |
 | `chord-finder` | tool | B | [lukeco11/chord-finder-for-move](https://github.com/lukeco11/chord-finder-for-move) `484a029` | MIT | `dsp.so` 8 KB | pass / pass / pass | silent | silent by design: chord tool: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio |
@@ -380,6 +381,8 @@ Results are in `build/module-test/results-{default,threaded,coload}.json`.
 | `scratch` | sound_generator | B | [mestela/schwung-scratch](https://github.com/mestela/schwung-scratch) `9be303b` | GPL-3.0-or-later | `dsp.so` 20 KB | pass / pass / pass | peak -0.8 dB |  |
 | `setbfree-organ` | sound_generator | B | [pdubucq/schwung-setbfree](https://github.com/pdubucq/schwung-setbfree) `53834bd` | GPL-2.0 | `dsp.so` 102 KB | pass / pass / pass | peak 0 dB |  |
 | `sf2` | sound_generator | B | [charlesvestal/schwung-sf2](https://github.com/charlesvestal/schwung-sf2) `825cf31` | LGPL-2.1 | `dsp.so` 80 KB | pass / pass / pass | peak -2.65 dB |  |
+| `shape-walk` | midi_fx | A | [mestela/schwung-shape-walk](https://github.com/mestela/schwung-shape-walk) `827275f` | MIT | `dsp.so` 20 KB | pass / pass / pass | 16 notes out |  |
+| `shape-walk-seq` | tool | A | [mestela/schwung-shape-walk](https://github.com/mestela/schwung-shape-walk) `827275f` | MIT | `dsp.so` 24 KB | pass / pass / pass | silent by design | overtake tool; plays chords from its UI |
 | `signal` | sound_generator | A | [filliformes/signal-move](https://github.com/filliformes/signal-move) `77b6a88` | GPL-3.0 | `dsp.so` 88 KB | pass / pass / pass | peak -17.07 dB |  |
 | `simian` | sound_generator | A | [legsmechanical/schwung-simian](https://github.com/legsmechanical/schwung-simian) `647c2bb` | GPL-3.0 | `dsp.so` 111 KB | pass / pass / pass | peak -6.22 dB |  |
 | `smack-in` | sound_generator | B | [timncox/schwung-smack](https://github.com/timncox/schwung-smack) `c018eca` | MIT | `dsp.so` 33 KB | pass / pass / pass | peak -6.23 dB |  |
@@ -472,7 +475,7 @@ Results are in `build/module-test/results-{default,threaded,coload}.json`.
     `genera`, `superboom`, `tinyk`, `omega`, `pushnpull`,
     `impressive-chords`
   - class B: `hank`, `weird-dreams`, `granny`, `slicer`, `elusive-muse`,
-    `forgetful`, `wayward`, `breakbeat`, `po32-drum`, `acid`
+    `forgetful`, `wayward`, `po32-drum`, `acid`
   - class C/D: `jp8000`, `loopex`, `twinsampler`, `dronage-tool`,
     `overwork-mix`
 - PolyForm Strict: `quilt`, `strut`.

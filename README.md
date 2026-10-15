@@ -10,7 +10,7 @@ This is not a re-creation. The page runs Schwung's own code, compiled to WebAsse
 - **the chain host**, loading modules with its real `dlopen()`;
 - **the shadow UI**: QuickJS running Schwung's 85k lines of UI JavaScript, unmodified, drawing
   the 128×64 OLED;
-- **catalog modules**, rebuilt from their own repositories (106 so far; 98 verified making sound inside the engine, the rest need audio input or a sample chosen).
+- **catalog modules**, rebuilt from their own repositories (109 so far; 100 verified making sound inside the engine, the rest need audio input or a sample chosen).
 
 Around it sits a virtual Move: the front panel (pads, knobs, buttons, jog, LEDs, OLED), and a
 small "Virtual Move" that stands in for Ableton's firmware, which can't be emulated.
@@ -57,7 +57,7 @@ status, [docs/WEB.md](docs/WEB.md) the front-end and controls.
 |---|---|
 | Schwung shadow UI: slots, chain editor, module picker, parameters, Master FX, settings | runs as on the device |
 | 4 chain slots: synth + MIDI FX + audio FX, mixing, sends | runs as on the device |
-| Catalog modules | 106 build from source; 98 verified making sound in the engine ([status](docs/MODULES.md)) |
+| Catalog modules | 109 build from source; 100 verified making sound in the engine ([status](docs/MODULES.md)) |
 | Persistence | slot state, presets and settings in IndexedDB |
 | Latency | ≈ 12 ms of engine buffering plus the browser's output latency |
 | Move's own instruments, sequencer, clips and sets | **not possible**: they live in Ableton's closed firmware |
