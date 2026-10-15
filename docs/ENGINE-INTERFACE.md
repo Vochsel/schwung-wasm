@@ -27,9 +27,14 @@ Module._sw_start(44100);        // boots device thread + shadow_ui thread; retur
 | `uint32_t *sw_leds_seq(void)` | Incremented when LEDs change. |
 | `uint8_t *sw_led_rgb(void)` | RGB overrides from SysEx `3B`: 2 × 128 × 4 B (`r,g,b,set`), notes then CCs. |
 | `int16_t *sw_audio_ring(void)` | Interleaved stereo int16 ring, `SW_RING_BLOCKS` × 128 frames. |
-| `uint32_t *sw_audio_ring_ctl(void)` | `[0]=write_block`, `[1]=read_block`, `[2]=capacity_blocks`, `[3]=underruns` (all u32, monotonically increasing block counters; index = counter % capacity). The worklet advances `[1]` and `Atomics.notify`s it; the device thread `Atomics.wait`s on it when the ring is full. |
+| `uint32_t *sw_audio_ring_ctl(void)` | `[0]=write_block`, `[1]=read_block`, `[2]=capacity_blocks`, `[3]=underruns`, `[4]=target fill`, `[5]=blocks dropped while the worklet was stalled` (all u32, monotonically increasing block counters; index = counter % capacity). The worklet advances `[1]` and `Atomics.notify`s it; the device thread `Atomics.wait`s on it when the ring is full. |
 | `void sw_set_bpm(float bpm)`, `void sw_transport(int playing)` | Virtual Move transport. |
-| `int sw_stat(int which)` | Debug counters (0 frames rendered, 1 ui ticks, 2 last render µs×10). |
+| `void sw_set_latency_blocks(int n)` | Ring fill target (`ctl[4]`, default 4 blocks ≈ 11.6 ms). |
+| `void sw_set_pad_layout(int track, int drums)`, `int sw_get_pad_layout(int track)`, `int sw_get_track(void)` | Virtual Move pad layout per track (Track 1 drums by default) and the selected track. |
+| `uint32_t *sw_ext_ring(void)`, `uint32_t *sw_ext_w(void)` | Cable-2 MIDI out (256 × `status<<16 \| d1<<8 \| d2`, monotonically increasing write counter). |
+| `int sw_web_param_set(int slot, const char *key, const char *value)` | Schwung's web-manager param ring (only reaches slots that already have a module). |
+| `int sw_ui_eval(const char *js)`, `int sw_ui_done(void)`, `const char *sw_ui_result(void)` | Dev/test door: run JS in the shadow UI's own QuickJS context between ticks; result is JSON. |
+| `int sw_stat(int which)` | 0 blocks rendered, 1 last block µs, 2 max block µs, 3 underruns, 4 dropped blocks, 5 display frames, 6 pad events Move saw, 7 notes echoed, 8 audio peak since last read (resets). |
 
 ## Worklet
 

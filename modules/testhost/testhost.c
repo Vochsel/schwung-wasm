@@ -155,7 +155,27 @@ static audio_fx_api_v2_t *fx;
  * never from the struct's on_midi (older modules' structs end before it). */
 static void (*fx_on_midi)(void *, const uint8_t *, int, int);
 static midi_fx_api_v1_t *mf;
+static plugin_api_v1_t *v1; /* kind 3: legacy singleton (tools/overtakes only) */
 static void *inst;
+static int g_audio_in; /* generators: also feed the saw into the mailbox audio-in */
+
+/* kinds: 0 = v2 generator, 1 = audio FX v2, 2 = MIDI FX, 3 = v1 generator */
+static void send_midi(const uint8_t *m, int len) {
+    if (kind == 0) sg->on_midi(inst, m, len, MOVE_MIDI_SOURCE_INTERNAL);
+    else if (kind == 3) { if (v1->on_midi) v1->on_midi(m, len, MOVE_MIDI_SOURCE_INTERNAL); }
+    else if (kind == 1) { if (fx_on_midi) fx_on_midi(inst, m, len, MOVE_MIDI_SOURCE_INTERNAL); }
+    else {
+        uint8_t o[MIDI_FX_MAX_OUT_MSGS][3]; int ol[MIDI_FX_MAX_OUT_MSGS];
+        int n = mf->process_midi(inst, m, len, o, ol, MIDI_FX_MAX_OUT_MSGS);
+        for (int i = 0; i < n && i < MIDI_FX_MAX_OUT_MSGS; i++) sine_midi(o[i], ol[i]);
+    }
+}
+static void set_param_any(const char *k, const char *v) {
+    if (kind == 0 && sg->set_param) sg->set_param(inst, k, v);
+    else if (kind == 3 && v1->set_param) v1->set_param(k, v);
+    else if (kind == 1 && fx->set_param) fx->set_param(inst, k, v);
+    else if (kind == 2 && mf->set_param) mf->set_param(inst, k, v);
+}
 static int16_t *out;
 static double diff_sum; /* FX: energy of (out - dry in) */
 
@@ -179,44 +199,36 @@ static void render_all(void) {
                 else if ((double)(clocks_sent - 1) / 48.0 < t1) rt[0] = 0xF8;
                 else break;
                 clocks_sent++;
-                if (kind == 0) sg->on_midi(inst, rt, 1, MOVE_MIDI_SOURCE_INTERNAL);
-                else if (kind == 1) { if (fx_on_midi) fx_on_midi(inst, rt, 1, MOVE_MIDI_SOURCE_INTERNAL); }
-                else {
-                    uint8_t o[MIDI_FX_MAX_OUT_MSGS][3]; int ol[MIDI_FX_MAX_OUT_MSGS];
-                    int n = mf->process_midi(inst, rt, 1, o, ol, MIDI_FX_MAX_OUT_MSGS);
-                    for (int i = 0; i < n && i < MIDI_FX_MAX_OUT_MSGS; i++) sine_midi(o[i], ol[i]);
-                }
+                send_midi(rt, 1);
             }
         }
         for (int e = 0; e < N_EVENTS; e++) {
             if (fired[e] || g_events[e].t >= t1) continue;
             fired[e] = 1;
-            const uint8_t *m = g_events[e].m;
-            if (kind == 0) sg->on_midi(inst, m, 3, MOVE_MIDI_SOURCE_INTERNAL);
-            else if (kind == 1) { if (fx_on_midi) fx_on_midi(inst, m, 3, MOVE_MIDI_SOURCE_INTERNAL); }
-            else {
-                uint8_t o[MIDI_FX_MAX_OUT_MSGS][3]; int ol[MIDI_FX_MAX_OUT_MSGS];
-                int n = mf->process_midi(inst, m, 3, o, ol, MIDI_FX_MAX_OUT_MSGS);
-                for (int i = 0; i < n && i < MIDI_FX_MAX_OUT_MSGS; i++) sine_midi(o[i], ol[i]);
-            }
+            send_midi(g_events[e].m, 3);
         }
         int16_t *blk = out + (size_t)b * BLOCK * 2;
+        /* 110 Hz saw at -6 dBFS for the first 1.5 s, then silence (tail). */
+        int16_t in[BLOCK * 2];
+        for (int f = 0; f < BLOCK; f++) {
+            double t = t0 + (double)f / SR;
+            int16_t s = 0;
+            if (t < 1.5) {
+                s = (int16_t)((saw * 2.0 - 1.0) * 16000.0);
+                saw += 110.0 / SR;
+                if (saw >= 1.0) saw -= 1.0;
+            }
+            in[2 * f] = in[2 * f + 1] = s;
+        }
+        /* audio-in mailbox: always for FX, on request for generators (the
+         * engine's mailbox audio-in is silent unless mic input is wired). */
+        if (kind == 1 || g_audio_in) memcpy(g_mailbox + MOVE_AUDIO_IN_OFFSET, in, MOVE_AUDIO_BYTES_PER_BLOCK);
         if (kind == 0) {
             sg->render_block(inst, blk, BLOCK);
+        } else if (kind == 3) {
+            v1->render_block(blk, BLOCK);
         } else if (kind == 1) {
-            /* 110 Hz saw at -6 dBFS for the first 1.5 s, then silence (tail). */
-            for (int f = 0; f < BLOCK; f++) {
-                double t = t0 + (double)f / SR;
-                int16_t s = 0;
-                if (t < 1.5) {
-                    s = (int16_t)((saw * 2.0 - 1.0) * 16000.0);
-                    saw += 110.0 / SR;
-                    if (saw >= 1.0) saw -= 1.0;
-                }
-                blk[2 * f] = blk[2 * f + 1] = s;
-            }
-            /* audio-in mailbox gets the same signal, for modules that read it */
-            memcpy(g_mailbox + MOVE_AUDIO_IN_OFFSET, blk, MOVE_AUDIO_BYTES_PER_BLOCK);
+            memcpy(blk, in, sizeof in);
             int16_t dry[BLOCK * 2];
             memcpy(dry, blk, sizeof dry);
             fx->process_block(inst, blk, BLOCK);
@@ -271,7 +283,18 @@ int main(int argc, char **argv) {
 
     kind = !strcmp(type, "sound_generator") ? 0 : !strcmp(type, "audio_fx") ? 1
              : !strcmp(type, "midi_fx") ? 2 : -1;
+    /* Tools/overtakes: like schwung_shim.c's overtake loader, try a v2
+     * generator, then an audio FX v2, then (here) the legacy v1 singleton. */
+    if (!strcmp(type, "tool") || !strcmp(type, "overtake") || !strcmp(type, "utility")) {
+        if (dlsym(h, MOVE_PLUGIN_INIT_V2_SYMBOL)) kind = 0;
+        else if (dlsym(h, AUDIO_FX_INIT_V2_SYMBOL)) kind = 1;
+        else if (dlsym(h, MOVE_PLUGIN_INIT_SYMBOL)) kind = 3;
+        else fail("dlsym", "no move_plugin_init_v2 / move_audio_fx_init_v2 / move_plugin_init_v1");
+    }
     if (kind < 0) fail("args", "unknown component_type");
+    const char *cj = getenv("TESTHOST_CREATE_JSON");
+    if (cj && !*cj) cj = NULL;
+    g_audio_in = getenv("TESTHOST_AUDIO_IN") && atoi(getenv("TESTHOST_AUDIO_IN"));
 
 
     if (kind == 0) {
@@ -279,14 +302,20 @@ int main(int argc, char **argv) {
         if (!init) fail("dlsym", "move_plugin_init_v2 missing");
         sg = init(&g_host);
         if (!sg || sg->api_version != MOVE_PLUGIN_API_VERSION_2) fail("init", "bad v2 api");
-        inst = sg->create_instance(dir, NULL);
+        inst = sg->create_instance(dir, cj);
         if (!inst) fail("create_instance", "returned NULL");
+    } else if (kind == 3) {
+        move_plugin_init_v1_fn init = (move_plugin_init_v1_fn)dlsym(h, MOVE_PLUGIN_INIT_SYMBOL);
+        v1 = init(&g_host);
+        if (!v1 || !v1->render_block) fail("init", "bad v1 api");
+        if (v1->on_load && v1->on_load(dir, cj) != 0) fail("on_load", "returned non-zero");
+        inst = v1;
     } else if (kind == 1) {
         audio_fx_init_v2_fn init = (audio_fx_init_v2_fn)dlsym(h, AUDIO_FX_INIT_V2_SYMBOL);
         if (!init) fail("dlsym", "move_audio_fx_init_v2 missing");
         fx = init(&g_host);
         if (!fx || !fx->create_instance || !fx->process_block) fail("init", "bad fx v2 api");
-        inst = fx->create_instance(dir, NULL);
+        inst = fx->create_instance(dir, cj);
         if (!inst) fail("create_instance", "returned NULL");
         fx_on_midi = (void (*)(void *, const uint8_t *, int, int))dlsym(h, "move_audio_fx_on_midi");
     } else {
@@ -294,10 +323,23 @@ int main(int argc, char **argv) {
         if (!init) fail("dlsym", "move_midi_fx_init missing");
         mf = init((const struct host_api_v1 *)&g_host);
         if (!mf || mf->api_version != MIDI_FX_API_VERSION) fail("init", "bad midi fx api");
-        inst = mf->create_instance(dir, NULL);
+        inst = mf->create_instance(dir, cj);
         if (!inst) fail("create_instance", "returned NULL");
     }
-    printf("[testhost] loaded %s as %s\n", so, type);
+    printf("[testhost] loaded %s as %s (kind %d)\n", so, type, kind);
+    /* TESTHOST_PARAMS: "key=value" lines applied with set_param before render. */
+    const char *ps = getenv("TESTHOST_PARAMS");
+    if (ps && *ps) {
+        char *dup = strdup(ps), *save = NULL;
+        for (char *ln = strtok_r(dup, "\n", &save); ln; ln = strtok_r(NULL, "\n", &save)) {
+            char *eq = strchr(ln, '=');
+            if (!eq) continue;
+            *eq = 0;
+            printf("[testhost] set_param %s=%s\n", ln, eq + 1);
+            set_param_any(ln, eq + 1);
+        }
+        free(dup);
+    }
 
     if (threaded) { sem_post(&g_go); pthread_join(render_tid, NULL); }
     else render_all();
@@ -330,6 +372,7 @@ int main(int argc, char **argv) {
     }
 
     if (kind == 0) sg->destroy_instance(inst);
+    else if (kind == 3) { if (v1->on_unload) v1->on_unload(); }
     else if (kind == 1) fx->destroy_instance(inst);
     else mf->destroy_instance(inst);
 

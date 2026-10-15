@@ -108,8 +108,16 @@ for (const id of todo) {
     try { testCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'modules/recipes', `${id}.json`), 'utf8')).test || {}; } catch {}
     const transport = testCfg.transport ?? (m.type === 'midi_fx');
     const t0 = Date.now();
-    const r = run(process.execPath, [TH_JS, m.type, `${m.path}/${m.dsp}`, m.path, `/out/${id}.wav`, String(seconds), transport ? '1' : '0', threaded ? '1' : '0'], {
-      env: { ...process.env, TESTHOST_DATA: path.join(VFS, 'data'), TESTHOST_OUT: OUT },
+    // test.params: {key: value} applied with set_param after create_instance
+    // test.create_json: string (or object) passed as create_instance's 2nd arg
+    // test.audio_in: feed the saw into the mailbox audio-in for generators too
+    // test.seconds: render length
+    const params = Object.entries(testCfg.params || {}).map(([k, v]) => `${k}=${v}`).join('\n');
+    const cj = testCfg.create_json == null ? '' : typeof testCfg.create_json === 'string' ? testCfg.create_json : JSON.stringify(testCfg.create_json);
+    const secs = testCfg.seconds ?? seconds;
+    const r = run(process.execPath, [TH_JS, m.type, `${m.path}/${m.dsp}`, m.path, `/out/${id}.wav`, String(secs), transport ? '1' : '0', threaded ? '1' : '0'], {
+      env: { ...process.env, TESTHOST_DATA: path.join(VFS, 'data'), TESTHOST_OUT: OUT,
+        TESTHOST_PARAMS: params, TESTHOST_CREATE_JSON: cj, TESTHOST_AUDIO_IN: testCfg.audio_in ? '1' : '0' },
       timeout: timeoutS * 1000,
     });
     const ms = Date.now() - t0;
