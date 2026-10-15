@@ -55,13 +55,14 @@ static int g_log_count = 0;
 static void th_log(const char *msg) {
     if (g_log_count++ < 200) printf("[module] %s\n", msg ? msg : "(null)");
 }
-static int th_midi_send(const uint8_t *msg, int len) { (void)msg; return len; }
+static int g_host_midi = 0; /* MIDI the module sent to the host (tools/sequencers) */
+static int th_midi_send(const uint8_t *msg, int len) { (void)msg; g_host_midi++; return len; }
 static int g_transport = 0;
 static int th_clock_status(void) { return g_transport ? MOVE_CLOCK_STATUS_RUNNING : MOVE_CLOCK_STATUS_STOPPED; }
 static float th_get_bpm(void) { return 120.0f; }
 static double th_beat_pos(void) { return g_beat; }
 static int th_slot_recv(void *inst) { (void)inst; return -1; }
-static int th_inject(const uint8_t *msg, int len) { (void)msg; (void)len; return 0; }
+static int th_inject(const uint8_t *msg, int len) { (void)msg; g_host_midi++; return len; }
 
 static host_api_v1_t g_host; /* static => reserved[] zeroed */
 
@@ -427,9 +428,9 @@ int main(int argc, char **argv) {
     if (write_wav(wav, out, total_frames) != 0) fail("wav", "cannot write wav");
     for (char *p = gp; *p; p++) if (*p == '"' || *p == '\\' || (unsigned char)*p < 32) *p = '_';
     printf("@@RESULT {\"ok\":true,\"rms\":%.6f,\"rms_dbfs\":%.2f,\"peak\":%d,\"railed_frac\":%.4f,"
-           "\"nan_suspect\":%s,\"transport\":%d,\"threaded\":%d,\"frames\":%d,\"midi_out_msgs\":%d,\"midi_out_note_ons\":%d,\"preset_name\":\"%s\",\"fx_diff_dbfs\":%.2f}\n",
+           "\"nan_suspect\":%s,\"transport\":%d,\"threaded\":%d,\"frames\":%d,\"midi_out_msgs\":%d,\"midi_out_note_ons\":%d,\"host_midi_msgs\":%d,\"preset_name\":\"%s\",\"fx_diff_dbfs\":%.2f}\n",
            rms, rms > 0 ? 20 * log10(rms) : -999.0, peak, railed_frac, nan_suspect ? "true" : "false", g_transport, threaded,
-           total_frames, g_fx_msgs, g_fx_note_ons, gp, diff_rms > 0 ? 20 * log10(diff_rms) : -999.0);
+           total_frames, g_fx_msgs, g_fx_note_ons, g_host_midi, gp, diff_rms > 0 ? 20 * log10(diff_rms) : -999.0);
     fflush(stdout);
     free(out);
     return 0;

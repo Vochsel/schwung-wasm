@@ -22,6 +22,7 @@ const panel = new Panel(canvas, {
 });
 
 function layout() {
+  if (viewMode === '3d') { view3d?.resize(); return; }
   const header = document.querySelector('header').offsetHeight;
   const footer = document.querySelector('footer').offsetHeight;
   const gutter = window.innerWidth < 600 ? 16 : 48;
@@ -30,12 +31,60 @@ function layout() {
   const w = Math.min(availW, availH * W / H, 1500);
   panel.resize(w);
 }
-window.addEventListener('resize', layout);
+window.addEventListener('resize', () => { showTip(null); layout(); });
 matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`).addEventListener?.('change', layout);
+
+/* ---------------- 2D / 3D view ----------------
+ * Both views drive the same Panel (MIDI, held state, LED palette), so
+ * switching never touches the engine or audio. three.js loads on first use. */
+let viewMode = '2d', view3d = null, view3dLoading = null;
+const VIEW_KEY = 'schwung.view';
+function initialView() {
+  const q = new URLSearchParams(location.search).get('view');
+  if (q === '2d' || q === '3d') return q;
+  try { return localStorage.getItem(VIEW_KEY) === '3d' ? '3d' : '2d'; } catch { return '2d'; }
+}
+async function setView(mode) {
+  viewMode = mode;
+  try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+  const u = new URL(location.href);
+  if (u.searchParams.has('view')) { u.searchParams.set('view', mode); history.replaceState(null, '', u); }
+  $('v2d').classList.toggle('on', mode === '2d');
+  $('v3d').classList.toggle('on', mode === '3d');
+  document.body.classList.toggle('v3d', mode === '3d');
+  showTip(null);
+  if (mode === '3d') {
+    panel.hidden = true;
+    $('view3d').classList.add('on');
+    try {
+      if (!view3d) {
+        view3dLoading ??= import('./view3d.js').then(({ View3D }) => new View3D($('view3d'), panel, { onHover: showTip }));
+        view3d = await view3dLoading;
+        $('v3dLoading').remove();
+      }
+      if (viewMode === '3d') view3d.setActive(true);
+    } catch (e) {
+      console.error('3D view failed:', e);
+      $('v3dLoading').textContent = '3D view unavailable: ' + (e?.message || e);
+    }
+  } else {
+    view3d?.setActive(false);
+    $('view3d').classList.remove('on');
+    panel.hidden = false;
+    layout();                                    // re-renders the 2D OLED and chassis
+    panel.dirty = true;
+  }
+}
+$('v2d').addEventListener('click', () => setView('2d'));
+$('v3d').addEventListener('click', () => setView('3d'));
+$('camReset').addEventListener('click', () => view3d?.resetView());
+$('camTop').addEventListener('click', () => view3d?.topView());
 layout();
+setView(initialView());
 
 function loop(now) {
-  panel.frame(now);
+  if (viewMode === '3d') { if (view3d?.active) view3d.frame(now); }
+  else panel.frame(now);
   requestAnimationFrame(loop);
 }
 requestAnimationFrame(loop);
@@ -332,6 +381,9 @@ window.swDebug = {
   oledLit: () => { if (!views) return 0; let n = 0; for (const b of views.display()) for (let v = b; v; v &= v - 1) n++; return n; },
   noteLed: (n) => views ? [...views.leds().subarray(n * 2, n * 2 + 2)] : null,
   ccLed: (c) => views ? [...views.leds().subarray(256 + c * 2, 256 + c * 2 + 2)] : null,
-  center: (id) => panel.clientCenter(id),
+  center: (id) => (viewMode === '3d' && view3d?.active ? view3d.clientCenter(id) : panel.clientCenter(id)),
+  get view() { return viewMode; },
+  get view3d() { return view3d; },
+  setView,
   sent: () => ({ ...panel.sent }),
 };

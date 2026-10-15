@@ -25,7 +25,9 @@
     "LICENSE"
   ],
   "test": {
-    "transport": true
+    "transport": true,
+    "expect_silent": true,
+    "silent_reason": "song arranger overtake: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio"
   },
   "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -Werror -DNDEBUG -Isrc/dsp src/dsp/arranger_engine.c; dist/arranger/{module.json,dsp.so,ui.js,settings-schema.json,help.json,LICENSE}"
 }

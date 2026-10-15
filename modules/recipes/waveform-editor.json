@@ -34,5 +34,9 @@
       "optional": true
     }
   ],
-  "upstream_build": "scripts/build.sh: gcc -O3 -DNDEBUG -c dwop.c rex_parser.c dwop_encode.c rex_writer.c; gcc -Ofast -shared plugin.c + objs -Isrc/dsp; dist/waveform-editor/{module.json,ui.js,dsp.so,help.json}. (Repo also commits prebuilt aarch64 src/dsp.so \u2014 ignored.)"
+  "upstream_build": "scripts/build.sh: gcc -O3 -DNDEBUG -c dwop.c rex_parser.c dwop_encode.c rex_writer.c; gcc -Ofast -shared plugin.c + objs -Isrc/dsp; dist/waveform-editor/{module.json,ui.js,dsp.so,help.json}. (Repo also commits prebuilt aarch64 src/dsp.so \u2014 ignored.)",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "audio file editor: plays audio only after the UI loads a file from the VFS"
+  }
 }

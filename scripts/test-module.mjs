@@ -89,6 +89,44 @@ function notesEnv(notes) {
   return ev.map(e => e.join(',')).join(';');
 }
 
+// ---- import check: every symbol a side module needs must be exported by the
+// main module. Emscripten stubs missing ones lazily, so without this a gap
+// (e.g. sched_setscheduler) only traps when a worker thread first calls it.
+function wasmSections(buf) {
+  let p = 8;
+  const u = () => { let r = 0, sh = 0, b; do { b = buf[p++]; r |= (b & 0x7f) << sh; sh += 7; } while (b & 0x80); return r >>> 0; };
+  const str = () => { const n = u(); const s = buf.toString('utf8', p, p + n); p += n; return s; };
+  const limits = () => { const f = u(); u(); if (f & 1) u(); };
+  const imps = [], exps = new Set();
+  while (p < buf.length) {
+    const id = buf[p++], size = u(), end = p + size;
+    if (id === 2) {
+      for (let n = u(); n > 0; n--) {
+        const mod = str(), field = str(), kind = buf[p++];
+        if (kind === 0) u(); else if (kind === 1) { p++; limits(); } else if (kind === 2) limits();
+        else if (kind === 3) { p += 2; } else if (kind === 4) { p++; u(); }
+        imps.push([mod, field]);
+      }
+    } else if (id === 7) {
+      for (let n = u(); n > 0; n--) { exps.add(str()); p++; u(); }
+    }
+    p = end;
+  }
+  return { imps, exps };
+}
+let mainExports = null;
+const PLUMBING = new Set(['memory', '__indirect_function_table', '__stack_pointer', '__memory_base', '__table_base']);
+function missingImports(soPath) {
+  if (!mainExports) mainExports = wasmSections(fs.readFileSync(TH_JS.replace(/\.js$/, '.wasm'))).exps;
+  const { imps, exps } = wasmSections(fs.readFileSync(soPath));
+  const miss = new Set();
+  for (const [mod, f] of imps) {
+    if (PLUMBING.has(f) || exps.has(f) || mainExports.has(f)) continue;
+    if (mod === 'env' || mod.startsWith('GOT.')) miss.add(f);
+  }
+  return [...miss].sort();
+}
+
 // ---- main --------------------------------------------------------------------
 if (doBuild) {
   const r = run('bash', ['scripts/build-modules.sh', ...ids], { stdio: 'inherit' });
@@ -117,6 +155,7 @@ for (const id of todo) {
     let testCfg = {};
     try { testCfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'modules/recipes', `${id}.json`), 'utf8')).test || {}; } catch {}
     const transport = testCfg.transport ?? (m.type === 'midi_fx');
+    const unresolved = missingImports(path.join(VFS, m.path, m.dsp));
     const t0 = Date.now();
     // test.params: {key: value} applied with set_param after create_instance
     // test.create_json: string (or object) passed as create_instance's 2nd arg
@@ -143,12 +182,15 @@ for (const id of todo) {
     const stats = line ? JSON.parse(line.slice(9)) : null;
     res = { id, type: m.type, ms, ...(stats || {}) };
     const peakDb = stats && stats.peak > 0 ? 20 * Math.log10(stats.peak / 32768) : -999;
-    if (r.error && r.error.code === 'ETIMEDOUT') res.reason = `timeout after ${timeoutS}s`;
+    if (unresolved.length) res.reason = `unresolved imports (main module lacks): ${unresolved.slice(0, 8).join(', ')}${unresolved.length > 8 ? ', …' : ''}`;
+    else if (r.error && r.error.code === 'ETIMEDOUT') res.reason = `timeout after ${timeoutS}s`;
     else if (!stats) {
       const err = out.split('\n').find(l => /Error|error:|Aborted|abort/.test(l)) || `exit ${r.status}`;
       res.reason = `crash: ${err.trim().slice(0, 200)}`;
     } else if (!stats.ok) res.reason = `${stats.stage}: ${stats.error}`;
     else if (m.type === 'midi_fx' && !stats.midi_out_note_ons) res.reason = 'no note-ons out of the MIDI FX';
+    else if (peakDb < -60 && stats.host_midi_msgs > 0) res.note = `silent audio, sent ${stats.host_midi_msgs} MIDI msgs to host`;
+    else if (peakDb < -60 && testCfg.expect_silent) res.note = `silent by design: ${testCfg.silent_reason || 'expect_silent'}`;
     else if (peakDb < -60) res.reason = `silent (peak ${peakDb.toFixed(1)} dBFS)`;
     else if (stats.nan_suspect) res.reason = 'output died while input was live (NaN?)';
     else if (stats.railed_frac > 0.5) res.reason = `railed output (${(stats.railed_frac * 100).toFixed(0)}% at full scale)`;
@@ -164,7 +206,7 @@ for (const id of todo) {
   results[id] = res;
   if (!res.pass) failed++;
   const extra = !res.ok ? '' : res.type === 'midi_fx' ? `  notes_out ${res.midi_out_note_ons}` : res.type === 'audio_fx' ? `  wet-dry ${res.fx_diff_dbfs} dBFS` : '';
-  console.log(`${res.pass ? 'PASS' : 'FAIL'}  ${id.padEnd(20)} ${res.ok ? `rms ${res.rms_dbfs} dBFS  peak ${res.peak_dbfs} dBFS${extra}  (${res.ms} ms)` : ''}${res.reason ? '  ' + res.reason : ''}${res.warn ? '  [warn: ' + res.warn + ']' : ''}`);
+  console.log(`${res.pass ? 'PASS' : 'FAIL'}  ${id.padEnd(20)} ${res.ok ? `rms ${res.rms_dbfs} dBFS  peak ${res.peak_dbfs} dBFS${extra}  (${res.ms} ms)` : ''}${res.reason ? '  ' + res.reason : ''}${res.note ? '  (' + res.note + ')' : ''}${res.warn ? '  [warn: ' + res.warn + ']' : ''}`);
 }
 fs.writeFileSync(resultsPath, JSON.stringify(results, null, 2) + '\n');
 console.log(`${todo.length - failed}/${todo.length} passed; results in build/module-test/results.json`);

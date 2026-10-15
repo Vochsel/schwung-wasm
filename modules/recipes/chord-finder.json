@@ -28,5 +28,9 @@
     "LICENSE"
   ],
   "wasm_notes": "Release also ships install-swap, a native aarch64 helper the UI os.exec()s; it cannot exist in the browser and is omitted.",
-  "upstream_build": "scripts/build-dsp.sh: gcc -std=c11 -O2 -Werror -fPIC -shared -Isrc/vendor src/dsp/chord_finder.c (+ install-swap binary); scripts/package.sh: dist/chord-finder/{module.json,ui.js,harmony.mjs,keyboard_v2.mjs,ui_state_v9.mjs,help.json,dsp.so,install-swap,README.md,LICENSE}"
+  "upstream_build": "scripts/build-dsp.sh: gcc -std=c11 -O2 -Werror -fPIC -shared -Isrc/vendor src/dsp/chord_finder.c (+ install-swap binary); scripts/package.sh: dist/chord-finder/{module.json,ui.js,harmony.mjs,keyboard_v2.mjs,ui_state_v9.mjs,help.json,dsp.so,install-swap,README.md,LICENSE}",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "chord tool: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio"
+  }
 }

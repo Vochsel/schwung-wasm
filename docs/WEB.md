@@ -29,10 +29,13 @@ the button creates the `AudioContext`, loads the engine and starts it.
 | `scripts/serve.mjs` | Static server for `web/`. Sends COOP `same-origin`, COEP `require-corp` and CORP `same-origin`, so `crossOriginIsolated` and SharedArrayBuffer work. Sets correct MIME types for `.wasm`, `.js`, `.mjs`, `.data` and `.json`. Uses `Cache-Control: no-store`. Node stdlib only. |
 | `web/index.html` | Page shell, status bar, Power-on overlay, help overlay (`?`). |
 | `web/app.js` | Engine loading, AudioContext and worklet wiring, status stats, keyboard, Web MIDI, toolbar (Open Schwung, Pads layout, Buffer, BPM). Exposes `window.swDebug` for tests. |
-| `web/panel.js` | The Move front panel on one canvas: geometry, palette and LED animation derived from `schwung-manager/static/mirror.html` (MIT, attribution kept). Also handles hit testing and pointer/wheel input, turning it into cable-0 MIDI. |
+| `web/panel.js` | The Move front panel on one canvas: geometry, palette and LED animation derived from `schwung-manager/static/mirror.html` (MIT, attribution kept). Also handles hit testing and pointer/wheel input, turning it into cable-0 MIDI. It owns the control list, held state and MIDI sending for both views, and exports the shared gesture helpers (`padVelocity`, `knobDragTicks`, `jogDragTicks`, `wheelTicks`) and `palette`/`white`. |
+| `web/view3d.js` | The 3D view (loaded on first use). Renders the model, picks controls by raycasting and routes every press, turn and touch through the `Panel`. It takes LED colours from `Panel.noteColor`/`ccColor`. |
+| `web/move3d/move3d.js` | The procedural Move model, adapted from ableton-move-demo-recorder (Apache-2.0, header kept). |
+| `web/vendor/three/` | three.js r181 subset (`build/` + the addons used), MIT, `LICENSE` included. Resolved by an import map in `index.html` (`three`, `three/addons/`). Nothing comes from a CDN, because the page is COEP `require-corp`. |
 | `web/worklet.js` | `AudioWorkletProcessor`. Reads int16 stereo 128-frame blocks from the ring in shared wasm memory. Advances `ctl[1]` and calls `Atomics.notify` on it. Counts underruns in `ctl[3]`. Handles any render-quantum size. |
 | `web/mock-engine.js` | A drop-in engine that implements the same exports over a shared `WebAssembly.Memory`. A module Worker plays the device thread: MIDI SPSC ring → 16-voice sine/saw synth + SVF + ping-pong delay → audio ring (paced to `ctl[4]` with `Atomics.wait`), plus the SSD1306 OLED and LEDs. Audio goes through the same worklet path as the real engine. |
-| `scripts/smoke.mjs` | Headless end-to-end test (see below). |
+| `scripts/smoke.mjs`, `scripts/smoke-3d.mjs` | Headless end-to-end tests of the 2D and 3D views (see below). |
 
 Data flow: the page's `rAF` loop reads `sw_display_seq` and `sw_leds_seq`. It redraws only
 when one changes or an LED is animating. Input goes straight to `_sw_midi_in`. Nothing on
@@ -76,6 +79,61 @@ LEDs come from `sw_leds()`, with `(value, channel)` entries for notes and then C
 
 The OLED is decoded from SSD1306 pages into a pixel-snapped device-resolution canvas, with
 a faint glow.
+
+### 3D view
+
+The **2D / 3D** toggle in the toolbar switches views. The choice is saved in
+`localStorage` (`schwung.view`), and `?view=3d` / `?view=2d` override it. Both views drive
+the same `Panel`, so switching does not touch the engine or the audio.
+
+- **Model**: Ableton's dimension drawing, built procedurally (`web/move3d/move3d.js`).
+  - Dark textured slab, tight bevels.
+  - 4 × 8 frosted pads, 8 encoders plus volume.
+  - Jog wheel, round icon buttons, pill track buttons, 16 steps.
+  - The OLED sits behind glass.
+- **Lighting** follows the move3d composition: room environment, key, rim and spot lights,
+  PCF shadows, GTAO ambient occlusion and a restrained bloom (threshold 0.9, strength 0.18).
+  - `?ao=0` turns the ambient occlusion off.
+  - `?bloom=0` turns the bloom off.
+- **OLED**: a 128 × 64 `DataTexture` decoded from `panel.oledBits`.
+  - Updated only when `sw_display_seq` changes and the pixels actually differ.
+  - Nearest filtering when magnified, so pixels stay crisp.
+  - Unlit (tone-mapping-free) white pixels, with a glare band that slides with the camera.
+- **LEDs** use the same palette and channel animation as 2D (`Panel.noteColor` /
+  `ccColor`; `sw_led_rgb` overrides win).
+  - Pads: emissive colour through a centre-weighted glow map.
+  - Track buttons: an LED line.
+  - Steps: an LED dot, plus a small white icon LED above each (CC 16–31).
+  - Round buttons: the icon lights in its LED colour. White buttons use the white column;
+    Play, Rec and Sample use RGB.
+  - Encoders: an LED dot (CC 71–78).
+- **Controls** behave as in 2D and send the same MIDI through the same helpers.
+  - Pads: velocity from where you hit (far edge = 127) or from pressure; multi-touch;
+    aftertouch.
+  - Knobs: drag up/down (Shift = fine) or scroll; touch notes; they rotate visually.
+  - Jog: drag around the rim, scroll, or click the centre.
+  - Buttons, steps and track buttons: press and hold.
+  - Pressed controls sink into the body.
+  - Icon mapping, checked against mirror.html: the three-dot button is **Shift** (CC 49),
+    **+ / −** are **Up / Down** (CC 55 / 54), and **< / >** are Left / Right.
+- **Camera** (a small built-in orbit controller):
+  - Drag empty space to orbit.
+  - Right-drag, middle-drag, Alt-drag or two fingers to pan.
+  - Scroll or pinch to zoom.
+  - Limits: elevation 0–77°, ±80° around, zoom 6 units to 2.5 × the fitted distance, pan
+    kept over the device.
+  - **Reset view** (or double-click empty space) gives the 3/4 view, fitted to the
+    viewport. **Top view** looks straight down.
+  - A pointer that starts on a control always operates the control, never the camera.
+- **Hover tooltips** show the control name and its shortcut. Keyboard shortcuts work
+  unchanged.
+- **Performance**:
+  - Renders on demand: on OLED or LED change, while an LED animates, when a control moves,
+    or when the camera moves. Idle Virtual Move home screen: 0 frames/s.
+  - devicePixelRatio is capped at 2.
+  - Shadow maps refresh only when something moves.
+  - The frame loop does no per-frame allocation. The palette is precomputed, and scratch
+    vectors and the raycast hit array are reused.
 
 ### Keyboard
 
@@ -146,3 +204,36 @@ What the test does:
    - the panel fits a 390 px wide viewport
 4. Saves screenshots to `build/smoke/`: `panel.png`, `panel-pad.png`, `panel-phone.png`,
    `boot.png`, `schwung-open.png`.
+
+`node scripts/smoke-3d.mjs` (same requirements and env) opens `?view=3d` and drives the 3D
+Move only through real pointer events on the WebGL canvas. It asserts:
+
+- three.js loads through the import map
+- the OLED texture follows `sw_display`
+- a pad click reaches Move (`sw_stat(6)`) and lights its LED
+- a knob drag sends relative CCs and touch notes, and the knob rotates
+- scrolling over the master sends CC 79
+- dragging around the jog rim sends CC 14, and clicking its centre sends CC 3
+- the three-dot button sends Shift (CC 49)
+- Open Schwung changes the screen
+- orbiting on empty space moves the camera and sends no MIDI
+- keyboard pads work and the pad sinks
+- 2D ↔ 3D keeps the engine and audio running, and the choice is remembered
+- the hover tooltip names the control
+- no underruns after boot and no page errors
+- the view fits a 390 px phone width
+
+Screenshots: `build/smoke/3d-boot.png`, `3d-pad.png`, `3d-schwung.png`, `3d-oled.png`
+(display close-up), `3d-orbit.png`, `3d-top.png`, `3d-switch-2d.png`, `3d.png`,
+`3d-phone.png`.
+
+### Credits / NOTICE
+
+- The 3D model (`web/move3d/move3d.js`) is adapted from `compositions/flat/lib/move3d.js`
+  in [ableton-move-demo-recorder](https://github.com/Vochsel/ableton-move-demo-recorder),
+  licensed under the Apache License 2.0. The changes are listed in the file header.
+- The lighting setup follows that repo's `compositions/move3d/index.html`.
+- three.js r181 (`web/vendor/three/`) is MIT, © 2010–2025 three.js authors.
+- The page links to `licenses.html` ("Credits & licences") from the status bar and the
+  help overlay.
+- Not affiliated with Ableton.

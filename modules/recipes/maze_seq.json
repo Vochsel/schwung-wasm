@@ -25,7 +25,9 @@
     }
   ],
   "test": {
-    "transport": true
+    "transport": true,
+    "expect_silent": true,
+    "silent_reason": "sequencer: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio"
   },
   "upstream_build": "scripts/build.sh: gcc -shared -fPIC -O2 -Isrc/include src/maze_seq/dsp/maze_seq.c -lm -lpthread; dist/maze_seq/{dsp.so,module.json,ui.js,help.json,web_ui.html}"
 }

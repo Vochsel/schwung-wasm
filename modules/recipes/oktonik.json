@@ -88,5 +88,9 @@
     }
   ],
   "wasm_notes": "Public profile packaged by upstream scripts/package-profiles.mjs (placeholder binaries, then extracted). install-swap (native helper the UI os.exec()s) is omitted. -fvisibility=hidden is safe: the init symbol is marked default-visible? see test.",
-  "upstream_build": "scripts/build-dsp.sh: cc -std=c11 -O2 -Werror -I src/vendor -fPIC -fvisibility=hidden -shared src/dsp/chord_pilot.c; scripts/package-profiles.mjs --public -> oktonik/{ui.js,*.mjs,profile.mjs,module.json,README.md,help.json,LICENSE,NOTICE.md,dsp.so,install-swap}"
+  "upstream_build": "scripts/build-dsp.sh: cc -std=c11 -O2 -Werror -I src/vendor -fPIC -fvisibility=hidden -shared src/dsp/chord_pilot.c; scripts/package-profiles.mjs --public -> oktonik/{ui.js,*.mjs,profile.mjs,module.json,README.md,help.json,LICENSE,NOTICE.md,dsp.so,install-swap}",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "chord/bass performance tool: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio"
+  }
 }

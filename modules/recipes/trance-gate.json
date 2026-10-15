@@ -1,0 +1,33 @@
+{
+  "id": "trance-gate",
+  "repo": "graebe/neon-ingvy-audio-plugins",
+  "commit": "0188772e6087e2be3d99a2bf986323d5a94a84e4",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "pre_build": [
+    "export RUSTUP_HOME=/w/build/rust-toolchain/rustup CARGO_HOME=/w/build/rust-toolchain/cargo PATH=/w/build/rust-toolchain/cargo/bin:$PATH; [ -x $CARGO_HOME/bin/rustup ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain none >/dev/null; rustup toolchain list | grep -q nightly-2026-09-01 || rustup toolchain install nightly-2026-09-01 --profile minimal -c rust-src >/dev/null; RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals -C relocation-model=pic' cargo +nightly-2026-09-01 rustc --locked --release -p tg-move --target wasm32-unknown-emscripten -Zbuild-std=std,panic_abort --crate-type staticlib 2>&1 | tail -40"
+  ],
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "ldflags": [
+    "-Wl,--whole-archive",
+    "target/wasm32-unknown-emscripten/release/libtg_move.a",
+    "-Wl,--no-whole-archive"
+  ],
+  "assets": [
+    "modules/trance-gate/module.json",
+    "modules/trance-gate/ui_chain.js",
+    "modules/trance-gate/help.json",
+    "LICENSE",
+    "THIRD_PARTY_LICENSES.md"
+  ],
+  "so_name": "trance-gate.so",
+  "test": {
+    "transport": true
+  },
+  "upstream_build": "modules/_shared/package.sh trance-gate: cargo build --locked --release -p tg-move --target aarch64-unknown-linux-gnu (toolchain 1.99.0, panic=abort, lto) -> dist/trance-gate/{trance-gate.so,module.json,ui_chain.js,help.json,(web_ui.html+assets from scripts/build-web.sh, optional),LICENSE,THIRD_PARTY_LICENSES.md}"
+}

@@ -22,7 +22,9 @@
     "src/help.json"
   ],
   "test": {
-    "audio_in": true
+    "audio_in": true,
+    "expect_silent": true,
+    "silent_reason": "pitch analyser: render_block always writes silence (documented in guitar_tuner.c); results are read via get_param"
   },
   "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Ivendor src/dsp/guitar_tuner.c; dist/guitar-tuner/{module.json,settings-schema.json,ui.js,help.json,dsp.so}"
 }

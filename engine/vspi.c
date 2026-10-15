@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
 
 #include "lib/schwung_spi_lib.h"
 #include "vm_font.h"
@@ -78,18 +79,27 @@ static int vm_track;                     /* 0..3, Track 1 = 0 */
 static _Atomic int vm_layout[4] = {1, 0, 0, 0};   /* 1 drums, 0 melodic */
 static _Atomic int vm_relight;
 static int vm_pad_note[128];             /* pad → sounding note (+1), 0 none */
-static uint32_t vm_out[64];              /* queued MIDI_OUT packets (cable<<28|...) */
+/* Queued MIDI_OUT packets. Notes and clock go first; LED updates fill the
+ * rest of the 20-packet frame and spill into later frames. */
+static uint32_t vm_out[64];              /* notes, clock */
 static int vm_out_n;
+static uint32_t vm_led_out[512];         /* LED updates */
+static int vm_led_n;
 static uint8_t vm_display[1024];
 static int vm_display_idx;               /* slice index Move must answer */
 
 static const int major[7] = {0, 2, 4, 5, 7, 9, 11};
 
 static void vm_queue(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
-    if (vm_out_n >= 64) return;
     uint8_t cin = (st >= 0xF8) ? 0x0F : (st >> 4);
-    vm_out[vm_out_n++] = ((uint32_t)((cable << 4) | cin) << 24) | ((uint32_t)st << 16) |
-                         ((uint32_t)d1 << 8) | d2;
+    uint32_t pk = ((uint32_t)((cable << 4) | cin) << 24) | ((uint32_t)st << 16) | ((uint32_t)d1 << 8) | d2;
+    if (cable == 0 && st < 0xF8) {           /* surface LED */
+        for (int i = 0; i < vm_led_n; i++)   /* newest value for a light wins */
+            if ((vm_led_out[i] & 0xFFFF0000u) == (pk & 0xFFFF0000u) && ((vm_led_out[i] >> 8) & 0xFF) == d1) { vm_led_out[i] = pk; return; }
+        if (vm_led_n < 512) vm_led_out[vm_led_n++] = pk;
+        return;
+    }
+    if (vm_out_n < 64) vm_out[vm_out_n++] = pk;
 }
 
 /* Move's pad layouts. Melodic: in key (C major), rows a fourth apart.
@@ -115,6 +125,99 @@ static void vm_light_pads(void) {
         vm_queue(0, 0x90, (uint8_t)p, vm_pad_note[p] ? 120 : vm_pad_colour(p));
 }
 
+
+/* ---- Virtual Move's step sequencer ----------------------------------------
+ * Move's own sequencer is firmware; this is the minimum that plays like it:
+ * one 16-step pattern per track, Play/Rec, pads recorded quantised to 16ths
+ * while recording, step buttons to see and toggle steps. Its notes go out on
+ * MIDI_OUT cable 2 on the track's channel, exactly as Move's playback would,
+ * so Schwung's slots play them. Patterns are saved in the user FS. */
+#define SEQ_STEPS 16
+#define SEQ_POLY 6
+typedef struct { uint8_t note[SEQ_POLY], vel[SEQ_POLY], n; } seq_step_t;
+static seq_step_t seq[4][SEQ_STEPS];
+static uint8_t seq_skip[4][SEQ_STEPS][SEQ_POLY];   /* just-recorded notes already heard live */
+static uint8_t seq_sounding[4][SEQ_POLY], seq_sounding_n[4];
+static int vm_rec, vm_delete_held, vm_tick, vm_step = -1;
+static int vm_last_note[4] = {36, 48, 48, 48};
+static int seq_dirty, seq_led_key = -1;
+static double seq_dirty_at;
+#define SEQ_PATH "/data/UserData/schwung-wasm/sequencer.bin"
+
+static void seq_load(void) {
+    FILE *f = fopen(SEQ_PATH, "rb");
+    if (!f) return;
+    if (fread(seq, sizeof seq, 1, f) != 1) memset(seq, 0, sizeof seq);
+    fclose(f);
+}
+
+static void seq_save(void) {
+    mkdir("/data/UserData/schwung-wasm", 0755);
+    FILE *f = fopen(SEQ_PATH, "wb");
+    if (f) { fwrite(seq, sizeof seq, 1, f); fclose(f); }
+    seq_dirty = 0;
+}
+
+static void seq_add(int t, int step, int note, int vel, int heard) {
+    seq_step_t *s = &seq[t][step];
+    for (int i = 0; i < s->n; i++) if (s->note[i] == note) { s->vel[i] = (uint8_t)vel; return; }
+    if (s->n >= SEQ_POLY) return;
+    seq_skip[t][step][s->n] = (uint8_t)heard;
+    s->note[s->n] = (uint8_t)note; s->vel[s->n] = (uint8_t)vel; s->n++;
+    seq_dirty = 1; seq_dirty_at = emscripten_get_now();
+}
+
+static void seq_all_off(void) {
+    for (int t = 0; t < 4; t++) {
+        for (int i = 0; i < seq_sounding_n[t]; i++) vm_queue(2, 0x80 | t, seq_sounding[t][i], 0);
+        seq_sounding_n[t] = 0;
+    }
+}
+
+/* One 16th: end the previous step's notes, start this one's, on every track. */
+static void seq_step_fire(int step) {
+    for (int t = 0; t < 4; t++) {
+        for (int i = 0; i < seq_sounding_n[t]; i++) vm_queue(2, 0x80 | t, seq_sounding[t][i], 0);
+        seq_sounding_n[t] = 0;
+        seq_step_t *s = &seq[t][step];
+        for (int i = 0; i < s->n; i++) {
+            if (seq_skip[t][step][i]) { seq_skip[t][step][i] = 0; continue; }
+            vm_queue(2, 0x90 | t, s->note[i], s->vel[i]);
+            seq_sounding[t][seq_sounding_n[t]++] = s->note[i];
+        }
+    }
+}
+
+/* Step LEDs for the selected track: lit where it has notes, playhead bright. */
+static void seq_light_steps(void) {
+    int key = vm_track * 64 + (vm_playing ? vm_step : -1);
+    uint32_t h = 0;
+    for (int i = 0; i < SEQ_STEPS; i++) h = h * 31 + seq[vm_track][i].n;
+    key ^= (int)(h << 8);
+    if (key == seq_led_key) return;
+    seq_led_key = key;
+    for (int i = 0; i < SEQ_STEPS; i++) {
+        uint8_t v = (vm_playing && i == vm_step) ? 120 : seq[vm_track][i].n ? 125 : 0;
+        vm_queue(0, 0x90, (uint8_t)(16 + i), v);
+    }
+}
+
+static void seq_on_tick(void) {
+    if (vm_tick % 6 == 0) {
+        vm_step = (vm_tick / 6) % SEQ_STEPS;
+        seq_step_fire(vm_step);
+    }
+    vm_tick++;
+}
+
+static void seq_record_pad(int note, int vel) {
+    if (!vm_rec || !vm_playing) return;
+    int pos = (vm_tick - 1) % 6;              /* ticks into the current 16th */
+    int cur = vm_step < 0 ? 0 : vm_step;
+    if (pos >= 3) seq_add(vm_track, (cur + 1) % SEQ_STEPS, note, vel, 1);   /* early for the next one */
+    else seq_add(vm_track, cur, note, vel, 0);                              /* late for this one */
+}
+
 /* What Move itself does with the input the shim let through. */
 static void vm_on_midi_in(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
     if (cable != 0) return;
@@ -127,7 +230,9 @@ static void vm_on_midi_in(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
             int n = vm_pad_to_note(d1);
             atomic_fetch_add(&stats[4], 1);
             vm_pad_note[d1] = n + 1;
+            vm_last_note[vm_track & 3] = n;
             vm_queue(2, 0x90 | ch, (uint8_t)n, d2);
+            seq_record_pad(n, d2);
             vm_queue(0, 0x90, d1, 120);
         } else if (vm_pad_note[d1]) {
             vm_queue(2, 0x80 | ch, (uint8_t)(vm_pad_note[d1] - 1), 0);
@@ -142,7 +247,23 @@ static void vm_on_midi_in(uint8_t cable, uint8_t st, uint8_t d1, uint8_t d2) {
         vm_queue(2, 0xA0 | (vm_track & 0x0F), (uint8_t)(vm_pad_note[d1] - 1), d2);
         return;
     }
+    if (type == 0x90 && d2 > 0 && d1 >= 16 && d1 < 32) {   /* step button: toggle */
+        seq_step_t *st = &seq[vm_track][d1 - 16];
+        if (st->n || vm_delete_held) st->n = 0;
+        else seq_add(vm_track, d1 - 16, vm_last_note[vm_track], 100, 0);
+        seq_dirty = 1; seq_dirty_at = emscripten_get_now();
+        seq_led_key = -1;
+        return;
+    }
+    if (type == 0xB0 && d1 == 119) { vm_delete_held = d2 >= 64; return; }
     if (type == 0xB0 && d2 == 127) {
+        if (d1 == 86) {                       /* Rec: arm; Delete+Rec clears the track */
+            if (vm_delete_held) { memset(seq[vm_track], 0, sizeof seq[vm_track]); seq_dirty = 1; seq_dirty_at = emscripten_get_now(); seq_led_key = -1; return; }
+            vm_rec = !vm_rec;
+            vm_queue(0, 0xB0, 86, vm_rec ? 127 : 0);
+            if (vm_rec && !vm_playing) vm_playing_req = 1;   /* Move starts recording on Rec */
+            return;
+        }
         if (d1 >= 40 && d1 <= 43) {           /* track buttons, 43 = Track 1 */
             vm_track = 43 - d1;
             vm_relight = 1;
@@ -160,15 +281,25 @@ static void vm_transport(void) {
         vm_playing = req;
         vm_clock_acc = 0;
         vm_queue(0, req ? 0xFA : 0xFC, 0, 0);
-        if (req) vm_queue(0, 0xF8, 0, 0);
         vm_queue(0, 0xB0, 85, req ? 127 : 0);
+        if (req) { vm_tick = 0; vm_queue(0, 0xF8, 0, 0); seq_on_tick(); }
+        else {
+            seq_all_off(); vm_step = -1;
+            if (vm_rec) { vm_rec = 0; vm_queue(0, 0xB0, 86, 0); }
+            if (seq_dirty) seq_save();
+        }
     }
-    if (!vm_playing) return;
+    seq_light_steps();
+    if (!vm_playing) {
+        if (seq_dirty && emscripten_get_now() - seq_dirty_at > 1500) seq_save();
+        return;
+    }
     double per_tick = sample_rate * 60.0 / (vm_bpm * 24.0);
     vm_clock_acc += FRAMES;
     while (vm_clock_acc >= per_tick) {
         vm_clock_acc -= per_tick;
         vm_queue(0, 0xF8, 0, 0);
+        seq_on_tick();
     }
 }
 
@@ -207,6 +338,11 @@ static void vm_draw_screen(void) {
     snprintf(buf, sizeof buf, "TRACK %d", vm_track + 1);
     vm_text(0, 14, buf, 2);
     vm_text(0, 33, vm_layout[vm_track & 3] ? "Drum rack pads" : "Melodic, C major", 1);
+    if (vm_rec) vm_text(128 - vm_text_w("REC", 2), 14, "REC", 2);
+    else if (vm_playing && vm_step >= 0) {
+        snprintf(buf, sizeof buf, "1.%d.%d", vm_step / 4 + 1, vm_step % 4 + 1);
+        vm_text(128 - vm_text_w(buf, 1), 18, buf, 1);
+    }
     vm_text(0, 45, "Shift+Vol+Track:", 1);
     vm_text(0, 54, "open Schwung", 1);
 }
@@ -214,7 +350,7 @@ static void vm_draw_screen(void) {
 static int vm_screen_key = -1;
 
 static void vm_update_screen(void) {
-    int key = vm_track | (vm_layout[vm_track & 3] << 2) | (vm_playing << 3) | ((int)(vm_bpm * 10) << 4);
+    int key = vm_track | (vm_layout[vm_track & 3] << 2) | (vm_playing << 3) | (vm_rec << 4) | ((vm_step + 1) << 5) | ((int)(vm_bpm * 10) << 10);
     if (key != vm_screen_key) { vm_screen_key = key; vm_draw_screen(); }
 }
 
@@ -223,9 +359,11 @@ static void vm_update_screen(void) {
 static void vm_write_tx(uint8_t *sh) {
     vm_update_screen();
     memset(sh + SCHWUNG_OFF_OUT_MIDI, 0, SCHWUNG_MIDI_OUT_MAX * 4);
+    /* leave room for the shim's own LED queue, as Move does */
     int n = vm_out_n < SCHWUNG_MIDI_OUT_MAX ? vm_out_n : SCHWUNG_MIDI_OUT_MAX;
-    for (int i = 0; i < n; i++) {
-        uint32_t p = vm_out[i];
+    int nl = vm_led_n < 12 - n ? vm_led_n : (12 - n > 0 ? 12 - n : 0);
+    for (int i = 0; i < n + nl; i++) {
+        uint32_t p = i < n ? vm_out[i] : vm_led_out[i - n];
         sh[i * 4 + 0] = (uint8_t)(p >> 24);
         sh[i * 4 + 1] = (uint8_t)(p >> 16);
         sh[i * 4 + 2] = (uint8_t)(p >> 8);
@@ -233,6 +371,8 @@ static void vm_write_tx(uint8_t *sh) {
     }
     memmove(vm_out, vm_out + n, (size_t)(vm_out_n - n) * sizeof vm_out[0]);
     vm_out_n -= n;
+    memmove(vm_led_out, vm_led_out + nl, (size_t)(vm_led_n - nl) * sizeof vm_led_out[0]);
+    vm_led_n -= nl;
 
     uint32_t idx = (uint32_t)vm_display_idx;
     if (idx >= 1 && idx <= 6) {
@@ -371,6 +511,7 @@ void schwung_wasm_dlsync_poll(void);
 static void *device_main(void *arg) {
     (void)arg;
     schwung_wasm_dlsync_set_device_thread();
+    seq_load();
     uint8_t *sh = schwung_spi_wasm_shadow();
     double last_read_change = now_ms();
     uint32_t last_read = 0;

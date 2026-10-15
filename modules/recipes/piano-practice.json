@@ -1,0 +1,33 @@
+{
+  "id": "piano-practice",
+  "repo": "graebe/schwung-piano-practice",
+  "commit": "4aa09980fffdbad0dd21feddc35f6b7440bbdae4",
+  "license": "GPL-3.0",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "pre_build": [
+    "export RUSTUP_HOME=/w/build/rust-toolchain/rustup CARGO_HOME=/w/build/rust-toolchain/cargo PATH=/w/build/rust-toolchain/cargo/bin:$PATH; [ -x $CARGO_HOME/bin/rustup ] || curl -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal --default-toolchain none >/dev/null; rustup toolchain list | grep -q nightly-2026-09-01 || rustup toolchain install nightly-2026-09-01 --profile minimal -c rust-src >/dev/null; cd dsp && RUSTFLAGS='-C target-feature=+atomics,+bulk-memory,+mutable-globals -C relocation-model=pic' cargo +nightly-2026-09-01 rustc --locked --release -p piano --target wasm32-unknown-emscripten -Zbuild-std=core,alloc --crate-type staticlib",
+    "mkdir -p dist && : > dist/dsp.so && sed '/verify-package/d' scripts/package.sh > scripts/.wasm-package.sh && bash scripts/.wasm-package.sh && rm -f dist/piano-practice/dsp.so dist/piano-practice-module.tar.gz"
+  ],
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "ldflags": [
+    "-Wl,--whole-archive",
+    "dsp/target/wasm32-unknown-emscripten/release/libpiano.a",
+    "-Wl,--no-whole-archive"
+  ],
+  "assets": [
+    "dist/piano-practice/*"
+  ],
+  "so_name": "dsp.so",
+  "wasm_notes": "Rust no_std crate built with a pinned nightly (nightly-2026-09-01, installed by pre_build into build/rust-toolchain) for wasm32-unknown-emscripten as a staticlib with -Zbuild-std=core,alloc, +atomics,+bulk-memory,+mutable-globals and relocation-model=pic (required to link into a -pthread SIDE_MODULE; the prebuilt core lacks atomics), then linked --whole-archive by emcc. Packaging = upstream scripts/package.sh minus its aarch64 verify step.",
+  "upstream_build": "scripts/build-dsp.sh: cargo build --release --target aarch64-unknown-linux-gnu (dsp/ workspace, cdylib libpiano.so -> dsp.so); scripts/package.sh: piano-practice/{module.json,ui.js,<mod>-<BUILD_ID>.mjs,dsp.so,help.json,exercises/*.json,README.md,LICENSE,THIRD_PARTY_LICENSES.md}",
+  "test": {
+    "params": {
+      "n": "48:100,55:100,60:100,64:100"
+    }
+  }
+}

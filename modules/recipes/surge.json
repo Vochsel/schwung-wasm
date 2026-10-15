@@ -10,7 +10,8 @@
   "pre_build": [
     "mkdir -p wasm-compat && printf '%s\\n' '#pragma once' 'static inline int backtrace(void **b, int n) { (void)b; (void)n; return 0; }' 'static inline char **backtrace_symbols(void *const *b, int n) { (void)b; (void)n; return 0; }' 'static inline void backtrace_symbols_fd(void *const *b, int n, int fd) { (void)b; (void)n; (void)fd; }' > wasm-compat/execinfo.h",
     "[ -f build-wasm/surge-libs.rsp ] || rm -rf build-wasm; [ -f build-wasm/surge-libs.rsp ] || ( emcmake cmake -S . -B build-wasm -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=\"-pthread -fPIC -isystem $PWD/wasm-compat\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC -DFMT_CONSTEVAL= -isystem $PWD/wasm-compat\" > build-wasm.log 2>&1 && cmake --build build-wasm --target surge-common -j8 >> build-wasm.log 2>&1 && find build-wasm -name '*.a' | sort > build-wasm/surge-libs.list && (echo -Wl,--start-group; cat build-wasm/surge-libs.list; echo -Wl,--end-group) > build-wasm/surge-libs.rsp ) || (tail -60 build-wasm.log; exit 1)",
-    "[ -f build-wasm/CMakeFiles/surge-move-plugin.dir/src/dsp/surge_plugin.cpp.o ] || make -C build-wasm src/dsp/surge_plugin.cpp.o > build-wasm-plugin.log 2>&1 || (tail -40 build-wasm-plugin.log; exit 1)"
+    "[ -f build-wasm/CMakeFiles/surge-move-plugin.dir/src/dsp/surge_plugin.cpp.o ] || make -C build-wasm src/dsp/surge_plugin.cpp.o > build-wasm-plugin.log 2>&1 || (tail -40 build-wasm-plugin.log; exit 1)",
+    "rm -rf wasm-dist && mkdir -p wasm-dist/surge-data/patches_3rdparty && cp -r src/dsp/surge/resources/data/patches_factory wasm-dist/surge-data/ && rm -rf wasm-dist/surge-data/patches_factory/Tutorials wasm-dist/surge-data/patches_factory/Templates && cp -r 'src/dsp/surge/resources/data/patches_3rdparty/LinnStrument MPE' wasm-dist/surge-data/patches_3rdparty/ && cp -r src/dsp/surge/resources/data/wavetables wasm-dist/surge-data/ && cp src/dsp/surge/resources/surge-shared/configuration.xml wasm-dist/surge-data/"
   ],
   "sources": [],
   "include": [],
@@ -32,7 +33,11 @@
     },
     "LICENSE",
     "NOTICE",
-    "src/ui.js"
+    "src/ui.js",
+    {
+      "from": "wasm-dist/surge-data",
+      "to": "surge-data"
+    }
   ],
   "so_name": "dsp.so",
   "upstream_build": "scripts/build.sh: cmake (CMakeLists.txt: Surge XT submodule, SURGE_SKIP_JUCE_FOR_RACK, SURGE_SKIP_LUA, block size 32) target surge-move-plugin -> dsp.so; dist/surge/{module.json,help.json,LICENSE,NOTICE,ui.js,dsp.so,surge-data/{patches_factory (minus Tutorials, Templates), patches_3rdparty/LinnStrument MPE, wavetables, configuration.xml}} (wasm: everything incl. surge_plugin.cpp is compiled by the upstream CMake via emcmake in pre_build; the recipe only links the side module)",

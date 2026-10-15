@@ -22,5 +22,9 @@
     "LICENSE",
     "README.md"
   ],
-  "upstream_build": "build-dsp.sh: gcc -O2 -shared -fPIC dsp/monitor.c -Ivendor; scripts/package.sh: dist/chorddex/{module.json,ui.js,help.json,dsp.so,LICENSE,README.md}"
+  "upstream_build": "build-dsp.sh: gcc -O2 -shared -fPIC dsp/monitor.c -Ivendor; scripts/package.sh: dist/chorddex/{module.json,ui.js,help.json,dsp.so,LICENSE,README.md}",
+  "test": {
+    "expect_silent": true,
+    "silent_reason": "MIDI monitor: no audio output"
+  }
 }

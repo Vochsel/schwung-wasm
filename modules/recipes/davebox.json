@@ -45,7 +45,9 @@
   ],
   "so_name": "dsp.so",
   "test": {
-    "transport": true
+    "transport": true,
+    "expect_silent": true,
+    "silent_reason": "8-track sequencer: emits MIDI via host midi_send_*/midi_inject_to_move, renders no audio (only a metronome click when the UI starts transport)"
   },
   "wasm_notes": "notes/ableton-export-drift-dummy.json is not committed upstream (the release build has it locally), so drift-dummy.json is optional/absent. pack.py is an export helper the UI os.exec()s via python3 \u2014 unavailable in the browser.",
   "upstream_build": "scripts/bundle_ui.sh (esbuild ui/ui.js -> dist/davebox/ui.js, + web_ui.html); scripts/build.sh: gcc -O3 -shared -fPIC dsp/seq8.c -I. (unity build); dist/davebox/{dsp.so,module.json,ui.js,web_ui.html,pack.py,ableton-master.json,drift-dummy.json,click-seq8.wav (python: assets/db-click.wav -> 48 kHz mono 16-bit normalised)}"
