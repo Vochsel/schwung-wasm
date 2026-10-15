@@ -1,0 +1,19 @@
+{
+  "id": "performance-fx",
+  "repo": "charlesvestal/schwung-performance-fx",
+  "commit": "4c43a73fa6ac2547387a06f0f65f93b4702c6eed",
+  "license": "MIT",
+  "component_type": "overtake",
+  "category_dir": "overtake",
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "skip": true,
+  "skip_reason": "Overtake built on Bungee, Eigen and FFTW-like code (about 2000 source files, 31 std::thread sites, 35 try blocks). Needs the overtake UI host plus probably -fwasm-exceptions (like surge). Realistic with significant work."
+}

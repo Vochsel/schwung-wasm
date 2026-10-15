@@ -1,0 +1,19 @@
+{
+  "id": "stretch",
+  "repo": "charlesvestal/schwung-stretch",
+  "commit": "985633c81ff22502b6cac1af8c189f9b965c0e34",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "skip": true,
+  "skip_reason": "Tool (needs the QuickJS UI host). DSP is Bungee (C++ plus Eigen, submodule), offline file time-stretching; a prebuilt dsp.so is committed. Bungee itself is portable C++, so this is realistic with work (CMake pre_build like nam), but it is file-centric and low value until tools run in the engine."
+}

@@ -1,13 +1,9 @@
 /* schwung-wasm: force-included BEFORE compat/wasm_compat.h when building
  * catalog modules (scripts/build-modules.sh).
  *
- * 1. wasm_compat.h defines `static inline pthread_setaffinity_np()` and
- *    `pthread_attr_setaffinity_np()`. Under _GNU_SOURCE (always on for C++)
- *    Emscripten's musl <pthread.h> already declares both extern, so the static
- *    definition is a hard error. Renaming them here, after <pthread.h> has
- *    declared the extern ones, binds the shims and every caller to private
- *    static names instead.
- * 2. Emscripten's libc omits musl's src/sched/ and pthread_setname_np, so a
+ * 1. (pthread_attr_setaffinity_np is handled by wasm_compat.h itself.)
+ * 2. Emscripten's libc omits musl's src/sched/, pthread_setaffinity_np and
+ *    pthread_setname_np (musl declares them, nothing defines them), so a
  *    module worker that demotes itself (sched_setscheduler(SCHED_OTHER) — the
  *    documented Schwung pattern), pins a CPU or names itself traps on an
  *    unresolved import. Same rename trick, behaviour-neutral no-ops: the
@@ -21,7 +17,7 @@
 #include <sched.h>
 #include <string.h>
 #define pthread_setaffinity_np schwung_wasm_pthread_setaffinity_np
-#define pthread_attr_setaffinity_np schwung_wasm_pthread_attr_setaffinity_np
+static inline int schwung_wasm_pthread_setaffinity_np(pthread_t t, size_t n, const void *s) { (void)t; (void)n; (void)s; return 0; }
 
 #define sched_setscheduler schwung_wasm_sched_setscheduler
 #define sched_getscheduler schwung_wasm_sched_getscheduler

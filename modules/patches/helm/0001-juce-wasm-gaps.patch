@@ -1,0 +1,40 @@
+diff --git a/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_SystemStats_wasm.cpp b/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_SystemStats_wasm.cpp
+index 803a74f..e04fa13 100644
+--- a/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_SystemStats_wasm.cpp
++++ b/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_SystemStats_wasm.cpp
+@@ -59,6 +59,9 @@ String SystemStats::getUserRegion()             { return {}; }
+ String SystemStats::getDisplayLanguage()        { return {}; }
+ 
+ //==============================================================================
++} // namespace juce
++#include <emscripten.h> /* schwung-wasm: emscripten_get_now */
++namespace juce {
+ void CPUInformation::initialise() noexcept
+ {
+     numLogicalCPUs = 1;
+diff --git a/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_ThreadPriorities_native.h b/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_ThreadPriorities_native.h
+index 6f63365..8f042f5 100644
+--- a/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_ThreadPriorities_native.h
++++ b/src/dsp/helm/third_party/JUCE/modules/juce_core/native/juce_ThreadPriorities_native.h
+@@ -66,7 +66,7 @@ struct ThreadPriorities
+         { Thread::Priority::background, AndroidThreadPriority::THREAD_PRIORITY_BACKGROUND },
+        #endif
+ 
+-       #if JUCE_LINUX || JUCE_BSD
++       #if JUCE_LINUX || JUCE_BSD || JUCE_WASM /* schwung-wasm */
+         { Thread::Priority::highest,    0 },
+         { Thread::Priority::high,       0 },
+         { Thread::Priority::normal,     0 },
+diff --git a/src/dsp/helm/third_party/JUCE/modules/juce_data_structures/app_properties/juce_PropertiesFile.cpp b/src/dsp/helm/third_party/JUCE/modules/juce_data_structures/app_properties/juce_PropertiesFile.cpp
+index 2ccbcc3..c33ebd3 100644
+--- a/src/dsp/helm/third_party/JUCE/modules/juce_data_structures/app_properties/juce_PropertiesFile.cpp
++++ b/src/dsp/helm/third_party/JUCE/modules/juce_data_structures/app_properties/juce_PropertiesFile.cpp
+@@ -98,7 +98,7 @@ File PropertiesFile::Options::getDefaultFile() const
+     if (folderName.isNotEmpty())
+         dir = dir.getChildFile (folderName);
+ 
+-   #elif JUCE_LINUX || JUCE_BSD || JUCE_ANDROID
++   #elif JUCE_LINUX || JUCE_BSD || JUCE_ANDROID || JUCE_WASM /* schwung-wasm */
+     auto dir = File (commonToAllUsers ? "/var" : "~")
+                       .getChildFile (folderName.isNotEmpty() ? folderName
+                                                              : ("." + applicationName));

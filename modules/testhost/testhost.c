@@ -36,7 +36,7 @@
 #include "audio_fx_api_v2.h"
 #include "midi_fx_api_v1.h"
 
-/* compat/wasm_compat.h maps dlopen -> schwung_wasm_dlopen (engine/dlsync.c,
+/* compat/wasm_compat.h maps dlopen/dlsym -> schwung_wasm_dlopen/_dlsym (engine/dlsync.c,
  * which also waits for the device thread to sync the new side module). The
  * test host provides it as a plain passthrough so modules that dlopen
  * themselves (and this file) still link; --threaded syncs via sem_wait. */
@@ -44,6 +44,11 @@
 #undef dlopen
 #endif
 EMSCRIPTEN_KEEPALIVE void *schwung_wasm_dlopen(const char *path, int flags) { return dlopen(path, flags); }
+/* ...and dlsym -> schwung_wasm_dlsym likewise. */
+#ifdef dlsym
+#undef dlsym
+#endif
+EMSCRIPTEN_KEEPALIVE void *schwung_wasm_dlsym(void *handle, const char *name) { return dlsym(handle, name); }
 
 #define SR 44100
 #define BLOCK 128
@@ -317,6 +322,22 @@ int main(int argc, char **argv) {
     if (threaded) {
         sem_init(&g_go, 0, 0);
         if (pthread_create(&render_tid, NULL, render_thread, NULL) != 0) fail("pthread", "pthread_create failed");
+    }
+
+    /* TESTHOST_PRELOAD="a.so:b.so:…": dlopen (and init) other modules first, in
+     * this one Emscripten namespace, like the engine after a few slot loads.
+     * Catches cross-module symbol binding (a later module calling into an
+     * earlier module's same-named export). */
+    const char *pre = getenv("TESTHOST_PRELOAD");
+    if (pre && *pre) {
+        char *dup = strdup(pre), *save = NULL; int n = 0;
+        for (char *pp = strtok_r(dup, ":", &save); pp; pp = strtok_r(NULL, ":", &save)) {
+            void *ph = dlopen(pp, RTLD_NOW | RTLD_LOCAL);
+            if (!ph) { printf("[testhost] preload failed: %s: %s\n", pp, dlerror()); continue; }
+            n++;
+        }
+        printf("[testhost] preloaded %d modules\n", n);
+        free(dup);
     }
 
     void *h = dlopen(so, RTLD_NOW | RTLD_LOCAL);

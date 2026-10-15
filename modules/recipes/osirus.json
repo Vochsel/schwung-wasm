@@ -1,0 +1,19 @@
+{
+  "id": "osirus",
+  "repo": "charlesvestal/schwung-virus",
+  "commit": "26e1292a5a97314ed7660b493cee1b9782a5df1a",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "skip": true,
+  "skip_reason": "Gearmulator DSP56300 emulator: JIT (asmjit) only for x86_64/arm64. The interpreter fallback would compile for wasm but is far from realtime for Virus firmware (the JIT is already near the limit on the Move's CM4). Also needs a user-supplied Virus ROM, plus threads/mmap. Not realistic."
+}

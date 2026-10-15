@@ -1,0 +1,55 @@
+{
+  "id": "dr32",
+  "repo": "legsmechanical/schwung-dr32",
+  "commit": "313086bdb58bbae56bbbe5d8ad5f1a4b6a20261a",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "dsp/*.c",
+    "dsp/engines/*.cpp",
+    "dsp/engines/*.c"
+  ],
+  "include": [
+    "dsp",
+    "dsp/engines"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11",
+    "-D_GNU_SOURCE"
+  ],
+  "cxxflags": [
+    "-std=c++14",
+    "-fno-exceptions",
+    "-fno-rtti",
+    "-fvisibility=hidden"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    "src/browser.js",
+    "src/resample.js",
+    "src/canvas.js",
+    "src/env_card.js",
+    "src/chain_params.json",
+    "src/engine_ui.json",
+    "src/engine_tpl.json",
+    {
+      "from": "src/samples",
+      "to": "samples"
+    },
+    "LICENSE",
+    "NOTICES.md",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -std=c11 -Idsp dsp/*.c; g++ -O3 -std=c++14 -fno-exceptions -fno-rtti -fvisibility=hidden -Idsp -Idsp/engines dsp/engines/*.cpp; gcc -O3 -std=c11 -fvisibility=hidden dsp/engines/*.c; link -shared; dist/dr32/{dsp.so,ui.js,module.json,browser.js,resample.js,canvas.js,env_card.js,chain_params.json,engine_ui.json,engine_tpl.json,samples/,LICENSE,NOTICES.md,help.json}",
+  "wasm_notes": "Kits normally come from Move's factory .ablpreset library (not redistributable); the smoke test runs with whatever the engine synthesises without a kit. -D_GNU_SOURCE: musl hides clock_gettime under strict -std=c11 (glibc doesn't)."
+}

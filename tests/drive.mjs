@@ -66,6 +66,7 @@ for (const step of process.argv.slice(2)) {
   else if (cmd === 'exists') console.log('exists', a[0], await page.evaluate(p => window.M.FS.analyzePath(p).exists, a[0]));
   else if (cmd === 'shiftvol') { await midi(0xB0, 49, 127); await midi(0x90, 8, 127); await wait(60); if (a[0] === 'note') { await midi(0x90, +a[1], 127); await wait(60); await midi(0x80, +a[1], 0); } else { await midi(0xB0, +a[0], 127); await wait(60); await midi(0xB0, +a[0], 0); } await midi(0x90, 8, 0); await midi(0xB0, 49, 0); }
   else if (cmd === 'listen') { await page.evaluate(() => window.M._sw_stat(8)); await wait(+(a[0] || 1500)); console.log('listen peak=' + await page.evaluate(() => window.M._sw_stat(8))); }
+  else if (cmd === 'js') console.log('js', await page.evaluate(a.join(' ')));
   else if (cmd === 'wait') await wait(+a[0]);
   else if (cmd === 'stats') console.log(JSON.stringify(await page.evaluate(() => window.stats())));
   if (cmd !== 'wait' && cmd !== 'stats') console.log(step, '→', await shot(step));

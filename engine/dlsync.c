@@ -10,6 +10,7 @@
  * before handing the handle back. The device thread syncs at the top of each
  * block (schwung_wasm_dlsync_poll), so a load costs at most one block more. */
 #undef dlopen
+#undef dlsym
 #include <dlfcn.h>
 #include <emscripten.h>
 #include <emscripten/threading.h>
@@ -31,7 +32,16 @@ void schwung_wasm_dlsync_poll(void) {
     emscripten_futex_wake((void *)&dl_synced, 0x7fffffff);
 }
 
+/* Any thread that is about to dlopen or dlsym first catches up with every
+ * library other threads have loaded, so the handles and function pointers it
+ * gets back (and old instances it may tear down) are callable from it. */
+EMSCRIPTEN_KEEPALIVE void *schwung_wasm_dlsym(void *h, const char *name) {
+    _emscripten_dlsync_self();
+    return dlsym(h, name);
+}
+
 EMSCRIPTEN_KEEPALIVE void *schwung_wasm_dlopen(const char *path, int flags) {
+    _emscripten_dlsync_self();
     void *h = dlopen(path, flags);
     if (!h || !device_thread || pthread_equal(pthread_self(), device_thread)) return h;
     uint32_t g = atomic_fetch_add(&dl_gen, 1) + 1;

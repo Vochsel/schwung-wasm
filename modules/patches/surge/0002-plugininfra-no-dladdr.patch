@@ -1,0 +1,18 @@
+diff --git a/src/dsp/surge/libs/sst/sst-plugininfra/src/paths_linux.cpp b/src/dsp/surge/libs/sst/sst-plugininfra/src/paths_linux.cpp
+index 9e37e5e..736bdfb 100644
+--- a/src/dsp/surge/libs/sst/sst-plugininfra/src/paths_linux.cpp
++++ b/src/dsp/surge/libs/sst/sst-plugininfra/src/paths_linux.cpp
+@@ -36,6 +36,13 @@ fs::path homePath()
+ 
+ fs::path sharedLibraryBinaryPath()
+ {
++#ifdef __EMSCRIPTEN__
++    /* schwung-wasm: Emscripten has no dladdr(). Surge only uses this as a
++     * fallback data-path root; the Schwung plugin passes surge-data explicitly. */
++    if (const char *p = std::getenv("SURGE_WASM_SO_PATH"); p && p[0])
++        return fs::path{p};
++    return fs::path{"/dsp.so"};
++#endif
+     Dl_info info;
+     if (!dladdr(reinterpret_cast<const void *>(&sharedLibraryBinaryPath), &info) ||
+         !info.dli_fname[0])

@@ -23,11 +23,16 @@ class SchwungRingProcessor extends AudioWorkletProcessor {
     this.port.onmessage = (e) => this.init(e.data);
   }
 
-  init({ memory, ring, ctl }) {
+  init(msg) {
+    if (msg.type === 'record') { this.recording = msg.on; this.rec = []; if (!msg.on) this.flushRec(true); return; }
+    const { memory, ring, ctl, inRing, inCtl } = msg;
     // A WebAssembly.Memory (shared) or a bare SharedArrayBuffer both work.
     this.buffer = memory instanceof WebAssembly.Memory ? memory.buffer : memory;
     this.ringOff = ring;
     this.ctl32 = new Int32Array(this.buffer, ctl, 4);
+    // Optional audio input (Move's line-in): the engine reads one block per
+    // frame from this ring into the mailbox's RX audio.
+    if (inRing) { this.inOff = inRing; this.inCtl = new Int32Array(this.buffer, inCtl, 4); this.inFill = 0; this.inBlock = new Int16Array(BLOCK * 2); }
     this.ready = true;
     this.port.postMessage({ type: 'ready', sampleRate });
   }
@@ -50,7 +55,30 @@ class SchwungRingProcessor extends AudioWorkletProcessor {
     this.consumed++;
   }
 
-  process(_inputs, outputs) {
+  pushInput(input) {
+    if (!this.inCtl || !input || input.length === 0 || !input[0]) return;
+    const L = input[0], R = input[1] || input[0];
+    for (let i = 0; i < L.length; i++) {
+      const b = this.inBlock, k = this.inFill * 2;
+      b[k] = Math.max(-1, Math.min(1, L[i])) * 32767;
+      b[k + 1] = Math.max(-1, Math.min(1, R[i])) * 32767;
+      if (++this.inFill === BLOCK) {
+        const w = Atomics.load(this.inCtl, 0) >>> 0, cap = (Atomics.load(this.inCtl, 2) >>> 0) || 16;
+        new Int16Array(this.buffer, this.inOff + (w % cap) * BLOCK * 4, BLOCK * 2).set(b);
+        Atomics.store(this.inCtl, 0, (w + 1) | 0);
+        this.inFill = 0;
+      }
+    }
+  }
+
+  // Recording the output: copy each quantum, hand chunks to the page.
+  flushRec(final) {
+    if (this.rec && this.rec.length) { const c = this.rec; this.rec = []; this.port.postMessage({ type: 'rec', chunks: c, final }); }
+    else if (final) this.port.postMessage({ type: 'rec', chunks: [], final });
+  }
+
+  process(inputs, outputs) {
+    this.pushInput(inputs[0]);
     const out = outputs[0];
     if (!out || out.length === 0) return true;
     const L = out[0], R = out[1] || out[0];
@@ -81,6 +109,8 @@ class SchwungRingProcessor extends AudioWorkletProcessor {
     // Release a fully played block now rather than at the next quantum, so the
     // engine sees the free slot as early as possible.
     if (this.cursor >= BLOCK && this.slot) { this.release(); this.slot = null; }
+
+    if (this.recording) { this.rec.push([L.slice(), R.slice()]); if (this.rec.length >= 344) this.flushRec(false); }
 
     if (currentTime - this.lastReport > 0.5) {
       this.lastReport = currentTime;

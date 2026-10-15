@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 // Smoke-test Schwung modules built by scripts/build-modules.sh.
 //
-//   node scripts/test-module.mjs [--build] [--threaded] [--seconds N] [id ...]
+//   node scripts/test-module.mjs [--build] [--threaded] [--coload] [--seconds N] [id ...]
 //
 // With no ids, tests every module in build/vfs/modules-manifest.json.
 // --build runs scripts/build-modules.sh for the ids first.
+// --coload first dlopens every other built module in the same process (one
+// Emscripten symbol namespace, like the engine after many slot loads).
 // --threaded renders on a pthread that already existed when the module was
 // dlopen()ed on the main thread (the engine's loader-thread/audio-thread shape).
 //
@@ -31,11 +33,12 @@ const TH_DIR = path.join(ROOT, 'build/testhost');
 let TH_JS; // build/testhost/<input-hash>/testhost.js, set by ensureTestHost()
 
 const args = process.argv.slice(2);
-let doBuild = false, seconds = 2, timeoutS = 180, threaded = false;
+let doBuild = false, seconds = 2, timeoutS = 180, threaded = false, coload = false;
 const ids = [];
 for (let i = 0; i < args.length; i++) {
   if (args[i] === '--build') doBuild = true;
   else if (args[i] === '--threaded') threaded = true;
+  else if (args[i] === '--coload') coload = true;
   else if (args[i] === '--seconds') seconds = Number(args[++i]);
   else if (args[i] === '--timeout') timeoutS = Number(args[++i]);
   else ids.push(args[i]);
@@ -117,7 +120,12 @@ function wasmSections(buf) {
 let mainExports = null;
 const PLUMBING = new Set(['memory', '__indirect_function_table', '__stack_pointer', '__memory_base', '__table_base']);
 function missingImports(soPath) {
-  if (!mainExports) mainExports = wasmSections(fs.readFileSync(TH_JS.replace(/\.js$/, '.wasm'))).exps;
+  if (!mainExports) {
+    // wasm exports of the main module, plus the JS-library functions its glue
+    // hands to side modules (wasmImports entries like `__cxa_throw:___cxa_throw`).
+    mainExports = wasmSections(fs.readFileSync(TH_JS.replace(/\.js$/, '.wasm'))).exps;
+    for (const m of fs.readFileSync(TH_JS, 'utf8').matchAll(/([A-Za-z_$][\w$]*):_\1(?=[,}])/g)) mainExports.add(m[1]);
+  }
   const { imps, exps } = wasmSections(fs.readFileSync(soPath));
   const miss = new Set();
   for (const [mod, f] of imps) {
@@ -172,7 +180,8 @@ for (const id of todo) {
         TESTHOST_PARAMS: params, TESTHOST_CREATE_JSON: cj, TESTHOST_AUDIO_IN: testCfg.audio_in ? '1' : '0',
         TESTHOST_REALTIME: testCfg.realtime ? '1' : '0',
         TESTHOST_WAIT_MS: String(testCfg.wait_ms || 0),
-        TESTHOST_NOTES: notesEnv(testCfg.notes) },
+        TESTHOST_NOTES: notesEnv(testCfg.notes),
+        TESTHOST_PRELOAD: coload ? manifest.filter(o => o.id !== id).map(o => `${o.path}/${o.dsp}`).join(':') : '' },
       timeout: timeoutS * 1000,
     });
     const ms = Date.now() - t0;

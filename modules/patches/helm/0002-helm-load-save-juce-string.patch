@@ -1,0 +1,13 @@
+diff --git a/src/dsp/helm/src/common/load_save.cpp b/src/dsp/helm/src/common/load_save.cpp
+index dd0795a..8ebd2a2 100644
+--- a/src/dsp/helm/src/common/load_save.cpp
++++ b/src/dsp/helm/src/common/load_save.cpp
+@@ -399,7 +399,7 @@ juce::File LoadSave::getConfigFile() {
+ #ifdef LINUX
+   config_options.folderName = "." + juce::String(ProjectInfo::projectName).toLowerCase();
+ #else
+-  config_options.folderName = String(ProjectInfo::projectName).toLowerCase();
++  config_options.folderName = juce::String(ProjectInfo::projectName).toLowerCase(); /* schwung-wasm */
+ #endif
+ 
+   return config_options.getDefaultFile();

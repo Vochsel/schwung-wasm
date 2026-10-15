@@ -1,0 +1,79 @@
+{
+  "id": "helm",
+  "repo": "andree182/schwung-helm",
+  "commit": "10823a8ebc3a0e1a0cd43d0c459e8bae63996c9d",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "submodules": true,
+  "pre_build": [
+    "rm -rf wasm-dist && mkdir -p 'wasm-dist/helm-data/patches' && cp -r 'src/dsp/helm/patches/Factory Presets' wasm-dist/helm-data/patches/ && mkdir -p 'wasm-dist/helm-data/patches/Factory Presets/Keys' && cp 'data/Move Organ.helm' 'wasm-dist/helm-data/patches/Factory Presets/Keys/'",
+    "mkdir -p wasm-gen && printf '%s\\n' '/* schwung-wasm: JUCE_WASM declares these (juce_ApplicationBase.cpp) but only the Linux/mac juce_Files_* define them. */' 'namespace juce { const char* const* juce_argv = nullptr; int juce_argc = 0; }' > wasm-gen/juce_wasm_argv.cpp"
+  ],
+  "sources": [
+    "src/dsp/helm/mopo/src/*.cpp",
+    "src/dsp/helm/src/synthesis/*.cpp",
+    "src/dsp/helm/third_party/JUCE/modules/juce_core/juce_core.cpp",
+    "src/dsp/helm/third_party/JUCE/modules/juce_core/juce_core_CompilationTime.cpp",
+    "src/dsp/helm/third_party/JUCE/modules/juce_events/juce_events.cpp",
+    "src/dsp/helm/third_party/JUCE/modules/juce_audio_basics/juce_audio_basics.cpp",
+    "src/dsp/helm/third_party/JUCE/modules/juce_data_structures/juce_data_structures.cpp",
+    "src/dsp/helm/src/common/helm_common.cpp",
+    "src/dsp/helm/src/common/load_save.cpp",
+    "src/dsp/helm/src/common/midi_manager.cpp",
+    "src/dsp/helm/src/common/synth_base.cpp",
+    "src/dsp/helm_plugin.cpp",
+    "wasm-gen/juce_wasm_argv.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/helm/JuceLibraryCode",
+    "src/dsp/helm/third_party/JUCE/modules",
+    "src/dsp/helm/mopo/src",
+    "src/dsp/helm/src/synthesis",
+    "src/dsp/helm/src/common",
+    "src/dsp/helm/concurrentqueue"
+  ],
+  "defines": [
+    "NDEBUG=1",
+    "JUCE_HEADLESS=1",
+    "JUCE_GUI_SUPPORT=0",
+    "JUCE_AUDIOPROCESSOR_NO_GUI=1",
+    "JUCE_GLOBAL_MODULE_SETTINGS_INCLUDED=1",
+    "JUCE_STANDALONE_APPLICATION=0",
+    "JucePlugin_Build_Standalone=0",
+    "JucePlugin_Build_VST=0",
+    "JucePlugin_Build_VST3=0",
+    "JucePlugin_Build_AU=0",
+    "JucePlugin_Build_RTAS=0",
+    "JucePlugin_Build_AAX=0",
+    "JUCE_USE_CURL=0",
+    "JUCE_WEB_BROWSER=0"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    "LICENSE",
+    "src/ui.js",
+    {
+      "from": "wasm-dist/helm-data",
+      "to": "helm-data"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt: C++17, mopo/*.cpp + synthesis/*.cpp + juce_core/events/audio_basics/data_structures + helm common + helm_plugin.cpp, -DLINUX=1 -DJUCE_HEADLESS=1 ...; dist/helm/{module.json,help.json,LICENSE,ui.js,dsp.so,helm-data/patches/Factory Presets (+Keys/Move Organ.helm)}",
+  "wasm_notes": "Built without upstream's -DLINUX=1 so JUCE 8.0.10 takes its JUCE_WASM platform path (Linux native headers like sys/prctl.h/sys/ptrace.h don't exist in Emscripten); LINUX only selected fallback patch/config dirs and the plugin sets its bank dir explicitly. Patch 0001 fills JUCE_WASM gaps (ThreadPriorities table, PropertiesFile default dir, emscripten.h include). -Dschwung_wasm_pthread_setaffinity_np(t,n,s)=0 works around compat/include/schwung_module_prelude.h renaming pthread_setaffinity_np to a symbol the current wasm_compat.h no longer defines (shared-infra bug; drop once fixed). pre_build generates wasm-gen/juce_wasm_argv.cpp defining juce::juce_argc/juce_argv (declared but undefined on JUCE_WASM).",
+  "cflags_all": [
+    "-Dschwung_wasm_pthread_setaffinity_np(t,n,s)=0"
+  ],
+  "skip": true,
+  "skip_reason": "Compiles (1.8 MB side module) but dlopen fails: JUCE 8.0.10's JUCE_WASM target has no native implementations for 59 juce_core/juce_events symbols helm links (DirectoryIterator::NativeIterator, File::getSpecialLocation, Thread::createNativeThread, MessageManager platform hooks, sockets/WebInputStream/NamedPipe/ChildProcess). Next step: compile JUCE as JUCE_LINUX with stub headers for sys/prctl.h, sys/ptrace.h, sys/timerfd.h, sys/sysinfo.h (POSIX natives mostly work on Emscripten), or add a small wasm natives file (dir iteration + pthread thread + no-op message queue). Realistic with ~half a day."
+}

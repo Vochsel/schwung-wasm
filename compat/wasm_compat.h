@@ -15,6 +15,8 @@ static inline int malloc_trim(size_t pad) { (void)pad; return 0; }
 #include <dlfcn.h>
 void *schwung_wasm_dlopen(const char *path, int flags);
 #define dlopen schwung_wasm_dlopen
+void *schwung_wasm_dlsym(void *handle, const char *name);
+#define dlsym schwung_wasm_dlsym
 /* glibc: CPU affinity. A browser schedules workers itself. */
 #include <pthread.h>
 #include <sched.h>

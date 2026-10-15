@@ -33,7 +33,8 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME || sh
 const page = await browser.newPage();
 const lines = [];
 page.on('console', m => lines.push(m.text()));
-page.on('pageerror', e => lines.push('PAGEERROR ' + e.message));
+page.on('pageerror', e => lines.push('PAGEERROR ' + e.message + '\n' + (e.stack || '')));
+page.on('worker', w => { w.on('console', m => lines.push('[worker] ' + m.text())); });
 await page.goto(`http://localhost:${srv.address().port}/tests/engine.html?log`);
 const wait = ms => new Promise(r => setTimeout(r, ms));
 for (let i = 0; i < 80 && !(await page.evaluate(() => window.ready).catch(() => false)); i++) await wait(250);

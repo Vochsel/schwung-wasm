@@ -1,0 +1,19 @@
+{
+  "id": "stems",
+  "repo": "charlesvestal/schwung-stems",
+  "commit": "f7d3fa9d0479d877859d39cf141811e19511aa61",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "skip": true,
+  "skip_reason": "Tool: SpleeterRT neural stem separation, offline over whole files (large models, heavy CPU, long-running). Technically compilable C, but offline neural processing of full tracks in a browser worker is impractical next to realtime audio. Low priority."
+}

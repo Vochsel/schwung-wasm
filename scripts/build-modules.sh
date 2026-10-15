@@ -55,6 +55,31 @@ function expand(pattern) {
 // Minimal wasm reader: returns the symbols a side module needs from the main
 // module (env.* imports and GOT.* entries for symbols it does not export
 // itself), skipping the memory/table/stack plumbing every side module has.
+// Symbols the host dlsym()s from a module (grep dlsym( in build/schwung/src:
+// chain_synth_load.c, chain_fx_load.c, shadow_chain_mgmt.c, schwung_shim.c's
+// overtake loader), plus clap_entry for the airwindows .clap side module.
+// Modules are linked SIDE_MODULE=2 exporting ONLY the ones they define:
+// Emscripten's dynamic linker has one global namespace, so any other export
+// would be bound by later-loaded modules (freak's plaits:: vs plaits).
+const ENTRY_POINTS = ['move_plugin_init_v2', 'move_plugin_init_v1', 'move_audio_fx_init_v2',
+  'move_audio_fx_init_v1', 'move_midi_fx_init', 'move_audio_fx_on_midi', 'move_plugin_render_split',
+  'clap_entry'];
+// Exports Emscripten itself adds to every side module.
+const EM_INTERNAL = /^(__wasm_call_ctors|__wasm_apply_data_relocs|__wasm_apply_global_relocs|_emscripten_tls_init|__wasm_init_tls|__tls_base|__tls_size|__tls_align|__start_em_asm|__stop_em_asm|__start_em_js|__stop_em_js|__start_em_lib_deps|__stop_em_lib_deps|__em_js__.*|__em_lib_deps_.*)$/;
+
+function wasmExports(buf) {
+  let p = 8;
+  const u = () => { let r = 0, sh = 0, b; do { b = buf[p++]; r |= (b & 0x7f) << sh; sh += 7; } while (b & 0x80); return r >>> 0; };
+  const str = () => { const n = u(); const s = buf.toString('utf8', p, p + n); p += n; return s; };
+  const out = [];
+  while (p < buf.length) {
+    const id = buf[p++], size = u(), end = p + size;
+    if (id === 7) for (let n = u(); n > 0; n--) { out.push(str()); p++; u(); }
+    p = end;
+  }
+  return out;
+}
+
 function wasmImports(buf) {
   let p = 8;
   const u = () => { let r = 0, sh = 0, b; do { b = buf[p++]; r |= (b & 0x7f) << sh; sh += 7; } while (b & 0x80); return r >>> 0; };
@@ -119,7 +144,7 @@ if (cmd === 'vars') {
   }
   const excludes = r.sources.filter(g => g.startsWith('!')).flatMap(g => expand(g.slice(1)));
   const srcs = [...new Set(sources)].filter(s => !excludes.includes(s));
-  const base = ['-O2', '-fPIC', '-pthread', '-include', '/w/compat/include/schwung_module_prelude.h', '-include', '/w/compat/wasm_compat.h',
+  const base = ['-O2', '-fPIC', '-pthread', '-fvisibility=hidden', '-include', '/w/compat/include/schwung_module_prelude.h', '-include', '/w/compat/wasm_compat.h',
     ...(r.include || []).map(i => '-I' + toW(path.join(srcDir, i))),
     ...(r.include_abs || []).map(i => '-I' + i),
     ...(r.defines || []).map(d => '-D' + d)];
@@ -130,14 +155,23 @@ if (cmd === 'vars') {
     const isCxx = /\.(cc|cpp|cxx|C)$/.test(s);
     const o = `$OBJ/o/${i}_${path.basename(s).replace(/\.[^.]+$/, '')}.o`;
     objs.push(o);
-    const flags = [...base, ...(r.cflags_all || []), ...(isCxx ? (r.cxxflags || []) : (r.cflags || [])),
+    const flags = [...base, ...(isCxx ? ['-fvisibility-inlines-hidden'] : []), ...(r.cflags_all || []), ...(isCxx ? (r.cxxflags || []) : (r.cflags || [])),
       ...((r.per_file_flags || {})[s] || [])];
     const c = `${isCxx ? 'em++' : 'emcc'} -c ${flags.map(q).join(' ')} ${q(s)} -o "${o}"`;
     lines.push(`printf '%s\\n' ${q(c.replace(/\$OBJ/g, toW(objDir)))} >> "$OBJ/cmds"`);
   });
   lines.push(`xargs -P ${process.env.JOBS || 8} -d '\\n' -I{} sh -c '{} || exit 255' < "$OBJ/cmds"`);
   const link = r.cxx ? 'em++' : 'emcc';
-  lines.push(`${link} -O2 -pthread -sSIDE_MODULE=1 ${(r.ldflags || []).map(q).join(' ')} ${objs.map(o => `"${o}"`).join(' ')} -o "$OBJ/${r.so_name}"`);
+  // Export only the host entry points this module defines (SIDE_MODULE=2
+  // errors on exporting an undefined symbol). Scan our objects plus any .o/.a
+  // or @response file named in ldflags (static deps, Rust staticlibs).
+  const ld = r.ldflags || [];
+  const extra = ld.flatMap(t => t.split(',')).filter(t => /\.(a|o)$/.test(t)).map(q);
+  const rsp = ld.filter(t => t.startsWith('@')).map(t => `$(cat ${q(t.slice(1))})`);
+  lines.push(`EXPORTS=$(/emsdk/upstream/bin/llvm-nm --defined-only -j ${objs.map(o => `"${o}"`).join(' ')} ${extra.join(' ')} ${rsp.join(' ')} 2>/dev/null | grep -xE '${ENTRY_POINTS.join('|')}' | sort -u | sed 's/^/_/' | paste -sd, -)`);
+  lines.push(`[ -n "$EXPORTS" ] || { echo "error: no host entry point (${ENTRY_POINTS.join(', ')}) defined" >&2; exit 1; }`);
+  lines.push('echo "exports: $EXPORTS"');
+  lines.push(`${link} -O2 -pthread -sSIDE_MODULE=2 -sEXPORTED_FUNCTIONS="$EXPORTS" ${ld.map(q).join(' ')} ${objs.map(o => `"${o}"`).join(' ')} -o "$OBJ/${r.so_name}"`);
   console.log(lines.join('\n'));
 } else if (cmd === 'stage') {
   fs.rmSync(stageDir, { recursive: true, force: true });
@@ -216,6 +250,22 @@ if (cmd === 'vars') {
     }
   }
   const sorted = Object.fromEntries(Object.keys(imports).sort().map(k => [k, imports[k]]));
+  // One global namespace: no two modules may export the same non-entry symbol,
+  // and no module should export anything beyond entry points + Emscripten's own.
+  const owners = {};
+  let bad = 0;
+  for (const e of mods) {
+    for (const x of wasmExports(fs.readFileSync(path.join(vfs, e.path, e.dsp)))) {
+      if (ENTRY_POINTS.includes(x) || EM_INTERNAL.test(x)) continue;
+      (owners[x] ||= []).push(e.id);
+    }
+  }
+  for (const [sym, ids] of Object.entries(owners)) {
+    if (ids.length > 1) { console.error(`!! symbol clash: ${sym} exported by ${ids.join(', ')}`); bad++; }
+  }
+  const extraExp = Object.entries(owners).filter(([, ids]) => ids.length === 1);
+  if (extraExp.length) console.error(`warning: ${extraExp.length} non-entry exports (e.g. ${extraExp.slice(0, 5).map(([s, i]) => `${i[0]}:${s}`).join(', ')})`);
+  if (bad) { console.error(`!! ${bad} exported-symbol clashes between modules`); process.exitCode = 6; }
   fs.writeFileSync(path.join(vfs, 'modules-imports.json'), JSON.stringify(sorted, null, 1) + '\n');
   fs.writeFileSync(path.join(vfs, 'modules-manifest.json'),
     JSON.stringify({ generated_at: new Date().toISOString(), modules: mods }, null, 2) + '\n');
@@ -319,8 +369,10 @@ for id in "$@"; do
     [ "$KEEP_GOING" = 1 ] || break
   fi
 done
-node "$HELPER" manifest "$OBJROOT" "$VFS"
-if [ ${#fails[@]} -gt 0 ]; then
-  echo "FAILED: ${fails[*]}"
+clash=0
+node "$HELPER" manifest "$OBJROOT" "$VFS" || clash=1
+[ "$clash" = 1 ] && echo "FAILED: exported-symbol clash check (see !! lines above)"
+if [ ${#fails[@]} -gt 0 ] || [ "$clash" = 1 ]; then
+  echo "FAILED: ${fails[*]-}"
   exit 1
 fi

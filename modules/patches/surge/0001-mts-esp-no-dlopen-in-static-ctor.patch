@@ -1,6 +1,8 @@
---- a/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp	2026-10-16 00:14:32
-+++ b/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp	2026-10-16 00:14:32
-@@ -161,6 +161,14 @@
+diff --git a/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp b/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp
+index 8aeb570..9ec62fb 100644
+--- a/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp
++++ b/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Client/libMTSClient.cpp
+@@ -161,6 +161,14 @@ struct mtsclientglobal
  #else
      void load_lib()
      {
@@ -8,7 +10,26 @@
 +        /* schwung-wasm: this runs from a static constructor, i.e. inside the
 +         * host's dlopen() of this module. Emscripten's dlopen lock is not
 +         * recursive, so a nested dlopen() here deadlocks; and there is no
-+         * MTS-ESP master library on the web anyway. */
++         * MTS-ESP library on the web anyway. */
++        handle = 0;
++        return;
++#endif
+         if (!(handle = dlopen("/Library/Application Support/MTS-ESP/libMTS.dylib", RTLD_NOW)) &&
+             !(handle = dlopen("/usr/local/lib/libMTS.so", RTLD_NOW)))
+         {
+diff --git a/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Master/libMTSMaster.cpp b/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Master/libMTSMaster.cpp
+index a30ae1a..35e654e 100644
+--- a/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Master/libMTSMaster.cpp
++++ b/src/dsp/surge/libs/oddsound-mts/MTS-ESP/Master/libMTSMaster.cpp
+@@ -163,6 +163,14 @@ struct mtsmasterglobal
+ #else
+     void load_lib()
+     {
++#ifdef __EMSCRIPTEN__
++        /* schwung-wasm: this runs from a static constructor, i.e. inside the
++         * host's dlopen() of this module. Emscripten's dlopen lock is not
++         * recursive, so a nested dlopen() here deadlocks; and there is no
++         * MTS-ESP library on the web anyway. */
 +        handle = 0;
 +        return;
 +#endif

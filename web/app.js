@@ -193,9 +193,16 @@ async function powerOn() {
     setInterval(pollTrack, 200);
     panel.setSource(views);
 
-    node = new AudioWorkletNode(actx, 'schwung-ring', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
-    node.port.onmessage = (e) => { if (e.data?.type === 'stat') workletConsumed = e.data.consumed; };
-    node.port.postMessage({ memory: Module.wasmMemory ?? Module.HEAPU8.buffer, ring: views.ptr.ring, ctl: views.ptr.ctl });
+    node = new AudioWorkletNode(actx, 'schwung-ring', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [2] });
+    node.port.onmessage = (e) => {
+      if (e.data?.type === 'stat') workletConsumed = e.data.consumed;
+      else if (e.data?.type === 'rec') onRecChunks(e.data);
+    };
+    node.port.postMessage({ memory: Module.wasmMemory ?? Module.HEAPU8.buffer, ring: views.ptr.ring, ctl: views.ptr.ctl,
+      inRing: Module._sw_in_ring?.(), inCtl: Module._sw_in_ctl?.() });
+    for (const id of ['micBtn', 'clickBtn', 'recBtn']) $(id).disabled = false;
+    if (!Module._sw_in_ring) $('micBtn').disabled = true;
+    if (!Module._sw_set_metronome) $('clickBtn').disabled = true;
     node.connect(actx.destination);
     await actx.resume();
     $('powerOverlay').classList.add('hidden');
@@ -346,6 +353,7 @@ window.addEventListener('wheel', (e) => {
 /* ---------------- Web MIDI (cable 2) ---------------- */
 let midiAccess = null, midiOn = false;
 const midiBtn = $('midiBtn');
+midiBtn.textContent = 'MIDI';
 if (!navigator.requestMIDIAccess) { midiBtn.disabled = true; midiBtn.title = 'Web MIDI is not available in this browser'; }
 function onMidi(e) {
   if (!midiOn || !started) return;
@@ -364,8 +372,79 @@ midiBtn.addEventListener('click', async () => {
   midiOn = !midiOn;
   midiBtn.classList.toggle('on', midiOn);
   const names = [...midiAccess.inputs.values()].map((i) => i.name);
-  midiBtn.title = midiOn ? 'Forwarding: ' + (names.join(', ') || 'no inputs yet') : 'Forward Web MIDI input to the engine on cable 2';
+  midiBtn.title = midiOn ? 'Forwarding: ' + (names.join(', ') || 'no inputs yet') : 'Web MIDI in and out on cable 2 (Move’s USB-A port)';
 });
+
+/* ---------------- audio input: the Move's line-in ---------------- */
+let micStream = null, micSrc = null;
+$('micBtn').addEventListener('click', async () => {
+  if (micSrc) {
+    micSrc.disconnect(); micStream.getTracks().forEach((t) => t.stop()); micSrc = micStream = null;
+    $('micBtn').classList.remove('on'); return;
+  }
+  try {
+    micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    micSrc = actx.createMediaStreamSource(micStream);
+    micSrc.connect(node);
+    $('micBtn').classList.add('on');
+  } catch (err) { $('micBtn').title = 'Audio input unavailable: ' + err.message; }
+});
+
+/* ---------------- metronome (Virtual Move) ---------------- */
+$('clickBtn').addEventListener('click', () => {
+  const on = !Module._sw_get_metronome();
+  Module._sw_set_metronome(on ? 1 : 0);
+  $('clickBtn').classList.toggle('on', on);
+});
+
+/* ---------------- record the output to a WAV ---------------- */
+let recChunks = null, recStart = 0, recTimer = 0;
+function onRecChunks({ chunks, final }) {
+  if (recChunks) recChunks.push(...chunks);
+  if (final && recChunks) { downloadWav(recChunks); recChunks = null; }
+}
+function downloadWav(chunks) {
+  const frames = chunks.reduce((n, c) => n + c[0].length, 0), sr = actx.sampleRate;
+  const buf = new ArrayBuffer(44 + frames * 4), v = new DataView(buf);
+  const str = (o, t) => { for (let i = 0; i < t.length; i++) v.setUint8(o + i, t.charCodeAt(i)); };
+  str(0, 'RIFF'); v.setUint32(4, 36 + frames * 4, true); str(8, 'WAVEfmt '); v.setUint32(16, 16, true);
+  v.setUint16(20, 1, true); v.setUint16(22, 2, true); v.setUint32(24, sr, true); v.setUint32(28, sr * 4, true);
+  v.setUint16(32, 4, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, frames * 4, true);
+  let o = 44;
+  for (const [L, R] of chunks) for (let i = 0; i < L.length; i++, o += 4) {
+    v.setInt16(o, Math.max(-1, Math.min(1, L[i])) * 32767, true);
+    v.setInt16(o + 2, Math.max(-1, Math.min(1, R[i])) * 32767, true);
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+  a.download = `schwung-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.wav`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+}
+$('recBtn').addEventListener('click', () => {
+  const on = !recChunks;
+  if (on) { recChunks = []; recStart = performance.now(); recTimer = setInterval(() => { $('recBtn').textContent = 'Recording ' + Math.round((performance.now() - recStart) / 1000) + 's'; }, 500); }
+  else { clearInterval(recTimer); $('recBtn').textContent = 'Record WAV'; }
+  $('recBtn').classList.toggle('on', on);
+  node.port.postMessage({ type: 'record', on });
+});
+
+/* ---------------- Web MIDI out (cable 2: Move's USB-A port) ---------------- */
+let extRead = 0;
+setInterval(() => {
+  if (!started || !Module._sw_ext_ring) return;
+  const mem = (Module.wasmMemory ?? Module.HEAPU8).buffer ?? Module.HEAPU8.buffer;
+  const w = new Uint32Array(mem, Module._sw_ext_w(), 1)[0];
+  if (!midiOn || !midiAccess) { extRead = w; return; }
+  const ring = new Uint32Array(mem, Module._sw_ext_ring(), 256);
+  if (w - extRead > 256) extRead = w - 256;
+  const outs = [...midiAccess.outputs.values()];
+  for (; extRead < w; extRead++) {
+    const e = ring[extRead % 256], st = e >>> 16 & 0xff;
+    const msg = (st & 0xf0) === 0xc0 || (st & 0xf0) === 0xd0 ? [st, e >>> 8 & 0x7f] : [st, e >>> 8 & 0x7f, e & 0x7f];
+    for (const o of outs) o.send(msg);
+  }
+}, 5);
 
 /* ---------------- debug hook (smoke test, console) ---------------- */
 window.swDebug = {
@@ -386,4 +465,5 @@ window.swDebug = {
   get view3d() { return view3d; },
   setView,
   sent: () => ({ ...panel.sent }),
+  inBlocks: () => Module?._sw_in_ctl ? new Uint32Array((Module.wasmMemory ?? Module.HEAPU8).buffer, Module._sw_in_ctl(), 2)[0] : null,
 };

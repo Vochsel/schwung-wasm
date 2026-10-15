@@ -23,13 +23,11 @@
   ],
   "pre_build": [
     "cd deps/fftw/fftw-3.3.10 && emconfigure ./configure --prefix=$OLDPWD/.wasm-deps --enable-static --disable-shared --disable-fortran --disable-doc --with-pic CFLAGS='-O2 -fPIC -pthread' > ../configure.log 2>&1 && emmake make -j8 > ../make.log 2>&1 && emmake make install > ../install.log 2>&1",
-    "emcmake cmake -S deps/libkeyfinder -B .wasm-deps/kf-build -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFFTW3_LIBRARY=$PWD/.wasm-deps/lib/libfftw3.a -DFFTW3_INCLUDE_DIR=$PWD/.wasm-deps/include -DCMAKE_INSTALL_PREFIX=$PWD/.wasm-deps -DCMAKE_C_FLAGS=\"-pthread -fPIC\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC\" > .wasm-deps/kf-cmake.log 2>&1 || { tail -30 .wasm-deps/kf-cmake.log; exit 1; }; cmake --build .wasm-deps/kf-build -j8 && cmake --install .wasm-deps/kf-build",
-    "mkdir -p build/wasm && printf \"%s\\n\" \"#include <stdlib.h>\" \"/* schwung-wasm: the main module is built without C++ exceptions (libc++abi noexcept), so it has no __cxa_throw. libkeyfinder only throws on invalid input; abort like -fno-exceptions would. */\" \"__attribute__((visibility(\\\"hidden\\\"))) void __cxa_throw(void *e, void *t, void (*d)(void *)) { (void)e; (void)t; (void)d; abort(); }\" > build/wasm/cxa_throw_stub.c"
+    "emcmake cmake -S deps/libkeyfinder -B .wasm-deps/kf-build -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFFTW3_LIBRARY=$PWD/.wasm-deps/lib/libfftw3.a -DFFTW3_INCLUDE_DIR=$PWD/.wasm-deps/include -DCMAKE_INSTALL_PREFIX=$PWD/.wasm-deps -DCMAKE_C_FLAGS=\"-pthread -fPIC\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC\" > .wasm-deps/kf-cmake.log 2>&1 || { tail -30 .wasm-deps/kf-cmake.log; exit 1; }; cmake --build .wasm-deps/kf-build -j8 && cmake --install .wasm-deps/kf-build"
   ],
   "sources": [
     "src/dsp/keyfinder_wrapper.cpp",
-    "src/dsp/keydetect.c",
-    "build/wasm/cxa_throw_stub.c"
+    "src/dsp/keydetect.c"
   ],
   "include": [
     "src/dsp",

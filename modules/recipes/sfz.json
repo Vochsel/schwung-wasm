@@ -1,0 +1,19 @@
+{
+  "id": "sfz",
+  "repo": "charlesvestal/schwung-sfz",
+  "commit": "b19c978cb3dbf2a87c7ad82d9a7795c99b9bd889",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "skip": true,
+  "skip_reason": "Shipping build is the Rust xsynth shim (cargo +nightly, staticlib) linked into dsp.so; sfizz is a legacy path. Needs a Rust nightly toolchain with -Zbuild-std for wasm32-unknown-emscripten, relocation-model=pic and +atomics,+bulk-memory to match the pthreads main module; not available in the emsdk image. Realistic with work (custom Docker image: emsdk + rustup nightly). Sample libraries need a VFS/upload flow."
+}
