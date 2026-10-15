@@ -62,6 +62,7 @@ for (const step of process.argv.slice(2)) {
   else if (cmd === 'back') { await midi(0xB0, 51, 127); await wait(60); await midi(0xB0, 51, 0); }
   else if (cmd === 'pad') { const p = 68 + (3 - +a[0]) * 8 + +a[1]; await page.evaluate(() => window.resetPeak()); await midi(0x90, p, 110); await wait(+(a[2] || 600)); const s = await page.evaluate(() => window.stats()); await midi(0x80, p, 0); console.log(`pad ${a[0]},${a[1]} peak=${s.peak}`); }
   else if (cmd === 'ext') { await page.evaluate(() => window.resetPeak()); await page.evaluate(([n]) => window.M._sw_midi_in(2, 0x90, n, 110), [+a[0]]); await wait(+(a[1] || 600)); const s = await page.evaluate(() => window.stats()); await page.evaluate(([n]) => window.M._sw_midi_in(2, 0x80, n, 0), [+a[0]]); console.log(`ext ${a[0]} peak=${s.peak} cpeak=${await page.evaluate(() => window.M._sw_stat(8))}`); }
+  else if (cmd === 'reload') { await page.evaluate(() => window.persist.save()); await page.reload(); for (let i = 0; i < 80 && !(await page.evaluate(() => window.ready).catch(() => false)); i++) await wait(250); await wait(+(a[0] || 7000)); }
   else if (cmd === 'wait') await wait(+a[0]);
   else if (cmd === 'stats') console.log(JSON.stringify(await page.evaluate(() => window.stats())));
   if (cmd !== 'wait' && cmd !== 'stats') console.log(step, '→', await shot(step));

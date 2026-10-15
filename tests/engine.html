@@ -3,12 +3,15 @@
 // Boots the real engine without audio output: a timer drains the ring the way
 // the AudioWorklet would, so the device thread runs at real time.
 import createSchwung from '../web/engine/schwung.js';
+import { restore, autosave } from '../engine/js/persist.mjs';
 const log = (...a) => { (window.__log ||= []).push(a.join(' ')); console.log(...a); };
 const M = await createSchwung({ locateFile: f => '../web/engine/' + f, print: t => log('[out]', t), printErr: t => log('[err]', t) });
 window.M = M;
 log('runtime up, crossOriginIsolated=' + crossOriginIsolated);
 if (location.search.includes('log')) { M.FS.writeFile('/data/UserData/schwung/debug_log_on', '1'); M.FS.writeFile('/data/UserData/schwung/shadow_midi_out_log_on', '1'); }
+log('restored files:', await restore(M));
 const rc = M._sw_start(44100);
+window.persist = autosave(M, { everyMs: 1000 });
 log('sw_start ->', rc);
 const ctl = new Int32Array(M.wasmMemory.buffer, M._sw_audio_ring_ctl(), 8);
 const ring = new Int16Array(M.wasmMemory.buffer, M._sw_audio_ring(), 16 * 256);

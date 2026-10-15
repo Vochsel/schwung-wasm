@@ -149,6 +149,13 @@ edit('src/shadow/shadow_ui.c',
      "    pid_t pid = fork();\n    if (pid == -1) {\n        JS_FreeCString(ctx, cmd);\n        return JS_NewInt32(ctx, -1);\n    }",
      'host_system_cmd without fork')
 
+# --- a dev door into the UI's JS context (engine/ui_eval.c) ---------------
+edit('src/shadow/shadow_ui.c',
+     "        /* Process incoming MIDI BEFORE tick() so that the current frame's\n",
+     "#ifdef SCHWUNG_WASM\n        { extern void schwung_wasm_ui_poll(JSContext *ctx); schwung_wasm_ui_poll(ctx); }\n#endif\n"
+     "        /* Process incoming MIDI BEFORE tick() so that the current frame's\n",
+     'page-queued JS runs on the UI thread, between ticks')
+
 
 def main():
     failed = 0

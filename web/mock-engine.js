@@ -21,8 +21,8 @@
 /* ------------------------------------------------------------------ layout */
 const LAYOUT = {
   displaySeq: 64, ledsSeq: 68, midiHead: 72, midiTail: 76,   // u32
-  ctl: 128,          // 4 x u32: write, read, capacity, underruns
-  stat: 160,         // 4 x u32: frames, ui ticks, render us*10, voices
+  ctl: 128,          // 8 x u32: write, read, capacity, underruns, target fill, dropped
+  stat: 160,         // 8 x u32: frames, last render us, max render us, -, -, -, voices, track
   bpm: 192,          // i32 bpm * 1000
   transport: 196,    // i32: -1 untouched, 0 stop, 1 play (set by sw_transport)
   display: 1024,     // 1024 B
@@ -32,7 +32,8 @@ const LAYOUT = {
   ring: 16384,       // RING_BLOCKS x 128 x 2 x int16
 };
 const MIDI_SLOTS = 512;
-const RING_BLOCKS = 8;
+const RING_BLOCKS = 16;
+const TARGET_FILL = 4;
 const BLOCK = 128;
 
 const IS_WORKER = typeof WorkerGlobalScope !== 'undefined' && self instanceof WorkerGlobalScope;
@@ -44,9 +45,11 @@ export default async function createMockSchwung(opts = {}) {
   const HEAPU8 = new Uint8Array(buf), HEAP32 = new Int32Array(buf), HEAPU32 = new Uint32Array(buf);
   const i32 = (off) => off >> 2;
   Atomics.store(HEAP32, i32(LAYOUT.ctl) + 2, RING_BLOCKS);
+  Atomics.store(HEAP32, i32(LAYOUT.ctl) + 4, TARGET_FILL);
   Atomics.store(HEAP32, i32(LAYOUT.bpm), 120000);
   Atomics.store(HEAP32, i32(LAYOUT.transport), -1);
   let worker = null;
+  const padLayout = [0, 0, 0, 0];   // accepted for API parity; the mock synth is always chromatic
 
   const Module = {
     isMock: true,
@@ -75,7 +78,18 @@ export default async function createMockSchwung(opts = {}) {
     _sw_audio_ring_ctl: () => LAYOUT.ctl,
     _sw_set_bpm(bpm) { Atomics.store(HEAP32, i32(LAYOUT.bpm), Math.round(bpm * 1000)); },
     _sw_transport(playing) { Atomics.store(HEAP32, i32(LAYOUT.transport), playing ? 1 : 0); },
-    _sw_stat: (which) => Atomics.load(HEAPU32, i32(LAYOUT.stat) + (which | 0)),
+    _sw_set_latency_blocks(n) { if (n >= 1 && n < RING_BLOCKS) Atomics.store(HEAP32, i32(LAYOUT.ctl) + 4, n); },
+    _sw_get_track: () => Atomics.load(HEAP32, i32(LAYOUT.stat) + 7),
+    _sw_set_pad_layout(track, drums) { padLayout[track & 3] = drums ? 1 : 0; },
+    _sw_get_pad_layout: (track) => padLayout[track & 3],
+    // Same meaning as the real engine's sw_stat: 0 frames, 1 last render us,
+    // 2 max render us, 3 underruns, 4 dropped, 5 display seq.
+    _sw_stat(which) {
+      if (which === 3) return Atomics.load(HEAPU32, i32(LAYOUT.ctl) + 3);
+      if (which === 4) return Atomics.load(HEAPU32, i32(LAYOUT.ctl) + 5);
+      if (which === 5) return Atomics.load(HEAPU32, i32(LAYOUT.displaySeq));
+      return Atomics.load(HEAPU32, i32(LAYOUT.stat) + (which | 0));
+    },
   };
   return Module;
 }
@@ -104,7 +118,7 @@ const FONT = (
 function runDevice({ memory, sampleRate, layout: Lo }) {
   const buf = memory.buffer;
   const U8 = new Uint8Array(buf), I32 = new Int32Array(buf), U32 = new Uint32Array(buf);
-  const ctl = new Int32Array(buf, Lo.ctl, 4);
+  const ctl = new Int32Array(buf, Lo.ctl, 8);
   const ring = new Int16Array(buf, Lo.ring, RING_BLOCKS * BLOCK * 2);
   const stat = (i, v) => Atomics.store(U32, (Lo.stat >> 2) + i, v >>> 0);
   const sr = sampleRate;
@@ -140,6 +154,7 @@ function runDevice({ memory, sampleRate, layout: Lo }) {
   let dPos = 0;
   let sampleClock = 0;
   let lastTransportWord = -1;
+  let maxUs = 0;
 
   const noteName = (n) => ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'][n % 12] + (Math.floor(n / 12) - 1);
   const event = (s) => { lastEvent = s; lastEventAt = performance.now(); };
@@ -167,7 +182,7 @@ function runDevice({ memory, sampleRate, layout: Lo }) {
   const rel = (d) => (d < 64 ? d : d - 128);
 
   function setPreset(t) {
-    track = t;
+    track = t; stat(7, t);
     PRESETS[t].k.forEach((v, i) => { knob[i] = v; });
     event('TRACK ' + (t + 1) + ' ' + PRESETS[t].name);
   }
@@ -314,8 +329,9 @@ function runDevice({ memory, sampleRate, layout: Lo }) {
     }
     for (const v of voices) if (v.on) active++;
     level = Math.max(pk, level * 0.97);
-    stat(2, Math.round((performance.now() - t0) * 10000));
-    stat(3, active);
+    const us = Math.round((performance.now() - t0) * 1000);
+    stat(1, us); if (us > maxUs) { maxUs = us; stat(2, us); }
+    stat(6, active);
   }
 
   /* ---------------- OLED (SSD1306 page layout) ---------------- */
@@ -415,12 +431,14 @@ function runDevice({ memory, sampleRate, layout: Lo }) {
   }
 
   /* ---------------- device loop ---------------- */
-  let frames = 0, uiTicks = 0, lastUi = 0;
+  let frames = 0, lastUi = 0;
   const cap = RING_BLOCKS;
   for (;;) {
     drainMidi();
     let w = Atomics.load(ctl, 0);
-    while (((w - Atomics.load(ctl, 1)) >>> 0) < cap) {
+    // Keep `target` blocks queued (ctl[4]), like the real device thread.
+    const target = Math.max(1, Math.min(cap - 1, Atomics.load(ctl, 4) || TARGET_FILL));
+    while (((w - Atomics.load(ctl, 1)) >>> 0) < target) {
       const idx = (w >>> 0) % cap;
       renderBlock(ring.subarray(idx * BLOCK * 2, (idx + 1) * BLOCK * 2));
       w = (w + 1) | 0;
@@ -433,9 +451,8 @@ function runDevice({ memory, sampleRate, layout: Lo }) {
       lastUi = now;
       drawDisplay(now);
       updateLeds();
-      stat(1, ++uiTicks);
     }
-    // Ring full: park until the worklet frees a slot (or 8 ms for UI/MIDI).
+    // Ring at target: park until the worklet frees a slot (or 8 ms for UI/MIDI).
     Atomics.wait(ctl, 1, Atomics.load(ctl, 1), 8);
   }
 }

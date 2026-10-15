@@ -40,9 +40,10 @@ emcc $OPT -g2 -pthread $OBJ/*.o -o /w/web/engine/schwung.js \
   -sMAIN_MODULE=1 -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createSchwung \
   -sENVIRONMENT=web,worker -sINITIAL_MEMORY=768MB -sALLOW_MEMORY_GROWTH=0 \
   -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB -sPTHREAD_POOL_SIZE=24 \
-  -sEXPORTED_RUNTIME_METHODS=wasmMemory,HEAPU8,HEAP16,HEAPU32,FS \
+  -sEXPORTED_RUNTIME_METHODS=wasmMemory,HEAPU8,HEAP16,HEAPU32,FS,ccall,cwrap,stringToNewUTF8,UTF8ToString \
   -Wl,--wrap=mmap,--wrap=munmap,--wrap=ftruncate,--wrap=fstat,--wrap=close,--wrap=shm_open,--wrap=shm_unlink \
   --preload-file /w/build/vfs-base/data@/data --preload-file /w/build/vfs/data@/data -lm -sUSE_ZLIB=1 2> /w/build/link.log || { cat /w/build/link.log; exit 1; }
 if grep "may need to be added to EXPORTED_FUNCTIONS" /w/build/link.log; then echo "UNDEFINED SYMBOLS (above)"; exit 1; fi
 IN
+cp engine/js/*.mjs web/engine/
 ls -la web/engine

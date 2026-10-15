@@ -13,6 +13,7 @@ let Module = null, actx = null, node = null, engineKind = null;
 let views = null;          // live typed-array accessors over wasm memory
 let started = false;
 let bpm = 120;
+let persist = null;
 
 /* ---------------- panel ---------------- */
 const panel = new Panel(canvas, {
@@ -72,7 +73,15 @@ async function loadEngine() {
   if (await haveRealEngine()) {
     const { default: createSchwung } = await import('./engine/schwung.js');
     engineKind = 'real';
-    return createSchwung({ print, printErr });
+    const engineBase = new URL('./engine/', import.meta.url);
+    const M = await createSchwung({ print, printErr, locateFile: (f) => new URL(f, engineBase).href });
+    // Persist the user's /data/UserData across reloads (IndexedDB), if the build ships it.
+    try {
+      persist = await import('./engine/persist.mjs');
+      const n = await persist.restore(M);
+      if (n) console.log('[persist] restored', n);
+    } catch (e) { persist = null; console.warn('[persist] unavailable:', e.message); }
+    return M;
   }
   const { default: createMockSchwung } = await import('./mock-engine.js');
   engineKind = 'mock';
@@ -126,7 +135,13 @@ async function powerOn() {
     if (rc !== 0) throw new Error('sw_start returned ' + rc);
     views = makeViews(Module);
     Module._sw_set_bpm?.(bpm);
+    if (Module._sw_set_latency_blocks) Module._sw_set_latency_blocks(Number($('buf').value));
+    else $('buf').disabled = true;
+    try { persist?.autosave(Module, { everyMs: 2000 }); } catch (e) { console.warn('[persist] autosave failed:', e); }
     started = true;
+    $('openBtn').disabled = false;
+    $('padsBtn').disabled = !Module._sw_set_pad_layout;
+    setInterval(pollTrack, 200);
     panel.setSource(views);
 
     node = new AudioWorkletNode(actx, 'schwung-ring', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2] });
@@ -153,31 +168,60 @@ let lastStat = null;
 function stats() {
   if (!views) return;
   const now = performance.now();
-  const w = views.ctl(0), r = views.ctl(1), cap = views.ctl(2), under = views.ctl(3);
-  const frames = Module._sw_stat(0), ui = Module._sw_stat(1), us10 = Module._sw_stat(2);
+  const w = views.ctl(0), r = views.ctl(1), cap = views.ctl(2), under = views.ctl(3), dropped = views.ctl(5);
+  const lastUs = Module._sw_stat(1), maxUs = Module._sw_stat(2);
+  const dseq = views.displaySeq();
   const fill = (w - r) >>> 0;
   const blockMs = 128 / 44100 * 1000;
   const lat = ((actx.baseLatency || 0) + (actx.outputLatency || 0)) * 1000 + fill * blockMs;
   $('sLat').textContent = lat.toFixed(1) + ' ms';
-  $('sLat').title = `baseLatency ${(actx.baseLatency * 1000).toFixed(1)} ms + outputLatency ${((actx.outputLatency || 0) * 1000).toFixed(1)} ms + ring ${fill}×${blockMs.toFixed(2)} ms`;
+  $('sLat').title = `baseLatency ${((actx.baseLatency || 0) * 1000).toFixed(1)} ms + outputLatency ${((actx.outputLatency || 0) * 1000).toFixed(1)} ms + ring ${fill} × ${blockMs.toFixed(2)} ms`;
   $('sRing').textContent = fill + '/' + cap;
   const uEl = $('sUnder');
-  if (lastStat) {
-    const dU = under - lastStat.under;
-    uEl.className = 'v' + (dU > 0 ? ' bad' : '');
-  }
-  uEl.textContent = String(under);
-  const renderUs = us10 / 10;
-  const cpu = renderUs / (blockMs * 1000) * 100;
-  $('sCpu').textContent = renderUs.toFixed(0) + ' µs/blk ' + cpu.toFixed(1) + '%';
+  uEl.className = 'v' + (lastStat && under - lastStat.under > 0 ? ' bad' : '');
+  uEl.textContent = String(under) + (dropped ? ' · ' + dropped + ' dropped' : '');
+  const cpu = lastUs / (blockMs * 1000) * 100;
+  $('sCpu').textContent = `${lastUs} µs/blk (${cpu.toFixed(0)}%) · max ${maxUs} µs`;
   $('sCpu').className = 'v' + (cpu > 70 ? ' bad' : cpu > 40 ? ' warn' : '');
-  if (lastStat) {
-    const dt = (now - lastStat.t) / 1000;
-    $('sUi').textContent = Math.round((ui - lastStat.ui) / dt) + ' Hz · ' + Math.round((frames - lastStat.frames) / dt * 128 / 1000 * 10) / 10 + 'k fr/s';
-  }
-  lastStat = { t: now, under, ui, frames };
+  if (lastStat) $('sUi').textContent = Math.round((dseq - lastStat.dseq) / ((now - lastStat.t) / 1000)) + ' fps';
+  lastStat = { t: now, under, dseq };
   $('sEngine').textContent = engineKind + (actx.state === 'running' ? '' : ' (' + actx.state + ')');
 }
+
+/* ---------------- latency (ring target fill) ---------------- */
+$('buf').addEventListener('change', (e) => { if (started) Module._sw_set_latency_blocks?.(Number(e.target.value)); });
+
+/* ---------------- Open Schwung: Shift + Volume touch + Track ---------------- */
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function openSchwung() {
+  if (!started) return;
+  const track = Module._sw_get_track ? Module._sw_get_track() : 0;
+  const trackId = 'track-' + (Math.max(0, Math.min(3, track)) + 1);
+  panel.press('btn-shift', true); panel.touch('master', true);
+  await sleep(60);
+  panel.press(trackId, true); await sleep(80); panel.press(trackId, false);
+  await sleep(40);
+  panel.touch('master', false); panel.press('btn-shift', false);
+}
+$('openBtn').addEventListener('click', openSchwung);
+
+/* ---------------- per-track pad layout (drums / notes) ---------------- */
+let curTrack = -1, curLayout = -1;
+function pollTrack() {
+  if (!Module?._sw_get_pad_layout) return;
+  const t = Module._sw_get_track ? Module._sw_get_track() : 0;
+  const l = Module._sw_get_pad_layout(t);
+  if (t === curTrack && l === curLayout) return;
+  curTrack = t; curLayout = l;
+  $('padsBtn').textContent = `T${t + 1} pads: ${l ? 'Drums' : 'Notes'}`;
+  $('padsBtn').classList.toggle('on', !!l);
+}
+$('padsBtn').addEventListener('click', () => {
+  if (!Module?._sw_set_pad_layout || curTrack < 0) return;
+  Module._sw_set_pad_layout(curTrack, curLayout ? 0 : 1);
+  pollTrack();
+});
+
 document.addEventListener('visibilitychange', () => { if (!document.hidden && actx?.state === 'suspended') actx.resume(); });
 
 /* ---------------- BPM ---------------- */
@@ -213,6 +257,7 @@ window.addEventListener('keydown', (e) => {
   if (e.repeat) { if (keyHeld.has(e.code) || PIANO[e.code] !== undefined) e.preventDefault(); return; }
   if ((e.metaKey || e.ctrlKey) && e.code === 'KeyZ') { hold(e.code, 'btn-undo'); e.preventDefault(); return; }
   if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.code === 'KeyQ') { openSchwung(); return; }
   if (e.code === 'KeyZ') { pianoBase = Math.max(0, pianoBase - 12); return; }
   if (e.code === 'KeyX') { pianoBase = Math.min(12, pianoBase + 12); return; }
   if (e.code === 'BracketLeft') { panel.nudge('jog', -1); return; }
@@ -280,8 +325,9 @@ window.swDebug = {
   get engine() { return engineKind; },
   get audioState() { return actx?.state; },
   get sampleRate() { return actx?.sampleRate; },
-  ctl: () => views ? [0, 1, 2, 3].map((i) => views.ctl(i)) : null,
+  ctl: () => views ? [0, 1, 2, 3, 4, 5].map((i) => views.ctl(i)) : null,
   stat: (i) => Module?._sw_stat(i),
+  openSchwung,
   displaySeq: () => views?.displaySeq(),
   oledLit: () => { if (!views) return 0; let n = 0; for (const b of views.display()) for (let v = b; v; v &= v - 1) n++; return n; },
   noteLed: (n) => views ? [...views.leds().subarray(n * 2, n * 2 + 2)] : null,
