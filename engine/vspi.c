@@ -26,6 +26,7 @@
 #include <time.h>
 
 #include "lib/schwung_spi_lib.h"
+#include "vm_font.h"
 
 void shim_spi_init(void);
 void schwung_spi_wasm_attach(uint8_t *hw);
@@ -171,9 +172,56 @@ static void vm_transport(void) {
     }
 }
 
+
+/* ---- Virtual Move's own screen -------------------------------------------
+ * What MoveOriginal would show when Schwung's UI is not on screen. Ableton's
+ * real screens can't be reproduced, so it shows the state Virtual Move owns
+ * and how to get into Schwung. */
+static void vm_px(int x, int y) {
+    if (x >= 0 && x < 128 && y >= 0 && y < 64) vm_display[(y >> 3) * 128 + x] |= (uint8_t)(1 << (y & 7));
+}
+
+static int vm_text(int x, int y, const char *t, int scale) {
+    for (; *t; t++) {
+        int c = (unsigned char)*t;
+        if (c < 32 || c > 126) c = '?';
+        for (int cx = 0; cx < VM_FONT_W; cx++)
+            for (int cy = 0; cy < VM_FONT_H; cy++)
+                if (vm_font[c - 32][cx] & (1 << cy))
+                    for (int sx = 0; sx < scale; sx++)
+                        for (int sy = 0; sy < scale; sy++) vm_px(x + cx * scale + sx, y + cy * scale + sy);
+        x += (VM_FONT_W + 1) * scale;
+    }
+    return x;
+}
+
+static int vm_text_w(const char *t, int scale) { return (int)strlen(t) * (VM_FONT_W + 1) * scale - scale; }
+
+static void vm_draw_screen(void) {
+    char buf[48];
+    memset(vm_display, 0, sizeof vm_display);
+    vm_text(0, 0, "MOVE", 1);
+    snprintf(buf, sizeof buf, "%s%d BPM", vm_playing ? "> " : "", (int)(vm_bpm + 0.5f));
+    vm_text(128 - vm_text_w(buf, 1), 0, buf, 1);
+    for (int x = 0; x < 128; x++) vm_px(x, 9);
+    snprintf(buf, sizeof buf, "TRACK %d", vm_track + 1);
+    vm_text(0, 14, buf, 2);
+    vm_text(0, 33, vm_layout[vm_track & 3] ? "Drum rack pads" : "Melodic, C major", 1);
+    vm_text(0, 45, "Shift+Vol+Track:", 1);
+    vm_text(0, 54, "open Schwung", 1);
+}
+
+static int vm_screen_key = -1;
+
+static void vm_update_screen(void) {
+    int key = vm_track | (vm_layout[vm_track & 3] << 2) | (vm_playing << 3) | ((int)(vm_bpm * 10) << 4);
+    if (key != vm_screen_key) { vm_screen_key = key; vm_draw_screen(); }
+}
+
 /* MoveOriginal's half of the frame, before the shim's pre callback: fresh
  * MIDI_OUT, its own display slice, silence for its audio. */
 static void vm_write_tx(uint8_t *sh) {
+    vm_update_screen();
     memset(sh + SCHWUNG_OFF_OUT_MIDI, 0, SCHWUNG_MIDI_OUT_MAX * 4);
     int n = vm_out_n < SCHWUNG_MIDI_OUT_MAX ? vm_out_n : SCHWUNG_MIDI_OUT_MAX;
     for (int i = 0; i < n; i++) {

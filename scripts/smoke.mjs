@@ -110,7 +110,14 @@ async function main() {
     if (targetInfos.some((t) => t.type === 'page')) break;
     await sleep(100);
   }
-  const { targetId } = await cdp.send('Target.createTarget', { url, newWindow: false });
+  await cdp.send('Target.createTarget', { url, newWindow: false });
+  let targetId = null;
+  for (let i = 0; i < 100 && !targetId; i++) {
+    const { targetInfos } = await cdp.send('Target.getTargets');
+    targetId = targetInfos.find((t) => t.type === 'page' && t.url.startsWith(url))?.targetId;
+    if (!targetId) await sleep(100);
+  }
+  if (!targetId) throw new Error('page target for ' + url + ' never appeared');
   const { sessionId: S } = await cdp.send('Target.attachToTarget', { targetId, flatten: true });
   const errors = [];
   cdp.on('Runtime.consoleAPICalled', (p) => {
@@ -141,7 +148,7 @@ async function main() {
 
   await waitFor('document.readyState === "complete" && !!window.swDebug');
 
-  check('crossOriginIsolated', await evaluate('crossOriginIsolated') === true);
+  check('crossOriginIsolated', await evaluate('crossOriginIsolated') === true, await evaluate('location.href + " isSecure=" + isSecureContext + " SAB=" + (typeof SharedArrayBuffer)'));
   await shot('poweroff.png');
 
   // Power on with a real (trusted) click.
