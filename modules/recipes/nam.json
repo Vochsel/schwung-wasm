@@ -1,0 +1,68 @@
+{
+  "id": "nam",
+  "repo": "charlesvestal/schwung-nam",
+  "commit": "da4af3fd1ac369f61094ba7c526367392e8fc606",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "submodules": true,
+  "pre_build": [
+    "[ -f build-wasm/NeuralAudio/libNeuralAudio.a ] || (emcmake cmake -S deps/NeuralAudio -B build-wasm -DCMAKE_CXX_STANDARD=20 -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS='-pthread -fPIC -ffast-math -DNDEBUG' -DCMAKE_CXX_FLAGS='-pthread -fPIC -ffast-math -DNDEBUG' -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_UTILS=OFF -DBUILD_NAMCORE=OFF -DBUILD_STATIC_RTNEURAL=OFF -DWAVENET_FRAMES=128 -DBUFFER_PADDING=8 > build-wasm.log 2>&1 && cmake --build build-wasm -j8 >> build-wasm.log 2>&1) || (tail -40 build-wasm.log; exit 1)",
+    "cp build-wasm/NeuralAudio/libNeuralAudio.a libNeuralAudio.a && cp $(find build-wasm -name libRTNeural.a | head -1) libRTNeural.a"
+  ],
+  "sources": [
+    "src/dsp/nam_plugin.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "deps/NeuralAudio",
+    "deps/NeuralAudio/NeuralAudio",
+    "deps/NeuralAudio/deps/RTNeural/modules/Eigen",
+    "deps/NeuralAudio/deps/RTNeural/modules/json",
+    "deps/NeuralAudio/deps/RTNeural/modules/json/single_include",
+    "deps/NeuralAudio/deps/RTNeural",
+    "deps/NeuralAudio/deps/math_approx/include",
+    "deps/NeuralAudio/deps/RTNeural-NAM/wavenet",
+    "deps/NeuralAudio/deps/NeuralAmpModelerCore"
+  ],
+  "defines": [
+    "NDEBUG",
+    "NAM_SAMPLE_FLOAT",
+    "DSP_SAMPLE_FLOAT",
+    "LSTM_MATH=FastMath",
+    "WAVENET_MATH=FastMath",
+    "WAVENET_MAX_NUM_FRAMES=128",
+    "LAYER_ARRAY_BUFFER_PADDING=8"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++20",
+    "-ffast-math"
+  ],
+  "ldflags": [
+    "libNeuralAudio.a",
+    "libRTNeural.a"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/models/*",
+      "to": "models/"
+    },
+    {
+      "from": "src/cabs/*",
+      "to": "cabs/"
+    }
+  ],
+  "so_name": "nam.so",
+  "upstream_build": "scripts/build.sh: cmake deps/NeuralAudio (C++20, -Ofast, BUILD_STATIC_RTNEURAL=OFF, WAVENET_FRAMES=128, BUFFER_PADDING=8) -> libNeuralAudio.a + libRTNeural.a; g++ -Ofast -std=c++20 -DNAM_SAMPLE_FLOAT -DDSP_SAMPLE_FLOAT -DLSTM_MATH=FastMath -DWAVENET_MATH=FastMath -DWAVENET_MAX_NUM_FRAMES=128 -DLAYER_ARRAY_BUFFER_PADDING=8 src/dsp/nam_plugin.cpp + libs -> nam.so; dist/nam/{module.json,help.json,nam.so,models/*,cabs/*}",
+  "wasm_notes": "Bundled models (src/models, 12 MB) are GPL-3.0 community captures from pelennor2170/NAM_models (licence file shipped alongside).",
+  "test": {
+    "seconds": 8
+  }
+}

@@ -11,6 +11,23 @@ bash scripts/stage-vfs.sh
 mkdir -p build/vfs/data/UserData/schwung/modules
 OPT="${OPT:--O2}"
 mkdir -p build/obj web/engine
+# Split catalog modules: small ones go in the core bundle, directories over
+# HEAVY_MB (and the sample library) in extra.data, loaded after boot.
+python3 - <<'PY'
+import os
+root='build/vfs/data'; heavy=[]; core=[]; lim=float(os.environ.get('HEAVY_MB','2.5'))*1e6
+size=lambda d: sum(os.path.getsize(os.path.join(a,f)) for a,_,fs in os.walk(d) for f in fs)
+mods=os.path.join(root,'UserData/schwung/modules')
+for cat in sorted(os.listdir(mods)) if os.path.isdir(mods) else []:
+    for m in sorted(os.listdir(os.path.join(mods,cat))):
+        d=os.path.join(mods,cat,m); (heavy if size(d)>lim else core).append(d)
+lib=os.path.join(root,'UserData/UserLibrary')
+if os.path.isdir(lib): heavy.append(lib)
+arg=lambda d: f"--preload-file /w/{d}@/{os.path.relpath(d,'build/vfs')}"
+open('build/core-preload.txt','w').write(' '.join(arg(d) for d in core))
+open('build/extra-preload.txt','w').write(' '.join(f"/w/{d}@/{os.path.relpath(d,'build/vfs')}" for d in heavy))
+print(f'core bundle: {len(core)} module dirs; extra bundle: {len(heavy)} dirs')
+PY
 EM_CWD=build/schwung OPT="$OPT" scripts/em bash -s <<'IN'
 set -euo pipefail
 OPT="${OPT:--O2}"
@@ -40,10 +57,16 @@ emcc $OPT -g2 -pthread $OBJ/*.o -o /w/web/engine/schwung.js \
   -sMAIN_MODULE=1 -sMODULARIZE -sEXPORT_ES6 -sEXPORT_NAME=createSchwung \
   -sENVIRONMENT=web,worker -sINITIAL_MEMORY=768MB -sALLOW_MEMORY_GROWTH=0 \
   -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB -sPTHREAD_POOL_SIZE=24 \
-  -sEXPORTED_RUNTIME_METHODS=wasmMemory,HEAPU8,HEAP16,HEAPU32,FS,ccall,cwrap,stringToNewUTF8,UTF8ToString \
+  -sEXPORTED_RUNTIME_METHODS=wasmMemory,HEAPU8,HEAP16,HEAPU32,FS,FS_createPath,FS_createDataFile,addRunDependency,removeRunDependency,ccall,cwrap,stringToNewUTF8,UTF8ToString \
   -Wl,--wrap=mmap,--wrap=munmap,--wrap=ftruncate,--wrap=fstat,--wrap=close,--wrap=shm_open,--wrap=shm_unlink \
-  --preload-file /w/build/vfs-base/data@/data --preload-file /w/build/vfs/data@/data -lm -sUSE_ZLIB=1 2> /w/build/link.log || { cat /w/build/link.log; exit 1; }
+  --post-js /w/engine/js/extra-post.js \
+  --preload-file /w/build/vfs-base/data@/data $(cat /w/build/core-preload.txt) -lm -sUSE_ZLIB=1 2> /w/build/link.log || { cat /w/build/link.log; exit 1; }
 if grep "may need to be added to EXPORTED_FUNCTIONS" /w/build/link.log; then echo "UNDEFINED SYMBOLS (above)"; exit 1; fi
 IN
+if [ -s build/extra-preload.txt ]; then
+  scripts/em python3 /emsdk/upstream/emscripten/tools/file_packager.py /w/web/engine/extra.data \
+    --preload $(cat build/extra-preload.txt) --js-output=/w/web/engine/extra.js >/dev/null
+else rm -f web/engine/extra.js web/engine/extra.data; fi
 cp engine/js/*.mjs web/engine/
+python3 scripts/gen-licenses.py
 ls -la web/engine

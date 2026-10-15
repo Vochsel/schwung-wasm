@@ -1,0 +1,28 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "guitar-tuner",
+  "repo": "eightfour-dev/schwung-guitar-tuner",
+  "commit": "343a097933bebf37ee285db062a632bee95ee76e",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/guitar_tuner.c"
+  ],
+  "include": [
+    "vendor"
+  ],
+  "assets": [
+    "src/module.json",
+    "src/settings-schema.json",
+    "src/ui.js",
+    "src/help.json"
+  ],
+  "test": {
+    "audio_in": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Ivendor src/dsp/guitar_tuner.c; dist/guitar-tuner/{module.json,settings-schema.json,ui.js,help.json,dsp.so}"
+}

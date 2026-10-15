@@ -1,0 +1,27 @@
+{
+  "id": "maze_seq_lite",
+  "repo": "sd88me/schwung-maze",
+  "commit": "e774a674eef281248282ab47f69a9456bf6631fc",
+  "license": "MIT",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": [
+    "src/maze_seq_lite/dsp/maze_seq_lite.c"
+  ],
+  "include": [
+    "src/include"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "src/maze_seq_lite/module.json",
+    "src/maze_seq_lite/help.json",
+    {
+      "from": "src/maze_seq_lite/web_ui.html",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -shared -fPIC -O2 -Isrc/include src/maze_seq_lite/dsp/maze_seq_lite.c; dist/maze_seq_lite/{dsp.so,module.json,help.json,web_ui.html}"
+}

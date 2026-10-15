@@ -1,0 +1,32 @@
+{
+  "defines": [],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "chord-finder",
+  "repo": "lukeco11/chord-finder-for-move",
+  "commit": "484a02973b5c1d92dddd9557edf73db61978a67d",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/chord_finder.c"
+  ],
+  "include": [
+    "src/vendor"
+  ],
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    "src/harmony.mjs",
+    "src/keyboard_v2.mjs",
+    "src/ui_state_v9.mjs",
+    "src/help.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "wasm_notes": "Release also ships install-swap, a native aarch64 helper the UI os.exec()s; it cannot exist in the browser and is omitted.",
+  "upstream_build": "scripts/build-dsp.sh: gcc -std=c11 -O2 -Werror -fPIC -shared -Isrc/vendor src/dsp/chord_finder.c (+ install-swap binary); scripts/package.sh: dist/chord-finder/{module.json,ui.js,harmony.mjs,keyboard_v2.mjs,ui_state_v9.mjs,help.json,dsp.so,install-swap,README.md,LICENSE}"
+}

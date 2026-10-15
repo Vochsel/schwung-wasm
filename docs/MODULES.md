@@ -51,6 +51,12 @@ From `src/modules/chain/dsp/chain_synth_load.c` and `chain_fx_load.c` (the chain
 | sound_generator | `modules/sound_generators/<id>/dsp.so` | `move_plugin_init_v2` (optional `move_plugin_render_split`) |
 | audio_fx | `modules/audio_fx/<id>/<id>.so` | `move_audio_fx_init_v2` (optional `move_audio_fx_on_midi`) |
 | midi_fx | `modules/midi_fx/<id>/dsp.so` | `move_midi_fx_init` |
+| tool | `modules/tools/<id>/<module.json "dsp" or dsp.so>` | shim overtake loader: `move_plugin_init_v2`, else `move_audio_fx_init_v2` |
+| overtake | `modules/overtake/<id>/<module.json "dsp" or dsp.so>` | same as tool |
+
+(Tool and overtake paths come from `src/shared/store_utils.mjs` `getInstallSubdir`
+and `schwung_shim.c` `shadow_overtake_dsp_load`. The test host also accepts a
+legacy `move_plugin_init_v1` for them.)
 
 `create_instance()` gets the module directory (`.../<category>/<id>`) and reads
 `module.json`, presets, banks and other assets from there itself. The staged
@@ -86,11 +92,29 @@ repo's own `scripts/build.sh` (or `Makefile`/`package.sh`) packaging step.
     "src/module.json",                  // string: glob, copied by basename
     {"from": "src/help.json", "optional": true},
     {"from": "src/presets/*.braids", "to": "presets/"},   // "to" ending in / = directory
-    {"mkdir": "presets"}                // empty directory the tarball ships
+    {"mkdir": "presets"},               // empty directory the tarball ships
+    {"from": "gen/*.wav", "to": "/data/UserData/UserLibrary/Samples/schwung-wasm-demo/"}  // absolute VFS path
   ],
   "so_name": "dsp.so",                  // device file name: dsp.so, or <id>.so for audio_fx
   "upstream_build": "…",                // free text: the upstream command this mirrors
-  "test": {"transport": true},          // optional test-module.mjs overrides
+  "extra_repos": [                      // pinned dependencies cloned INSIDE the module tree
+    {"repo": "owner/lib", "commit": "<sha>", "dir": "deps/lib", "submodules": false}],
+  "downloads": [                        // sha256-pinned files, cached in build/module-downloads/
+    {"url": "https://…/x.tar.gz", "sha256": "…", "src": true, "to": "deps/x"},          // into the source tree (extracted)
+    {"url": "https://…/kit.zip", "sha256": "…", "to": "/data/UserData/UserLibrary/Samples/schwung-wasm-demo/kit",
+     "extract": "zip", "license": "CC0-1.0"}],                                           // into the VFS
+  "pre_build": ["emcmake cmake -S deps/lib -B deps/lib/b -DCMAKE_C_FLAGS='-fPIC -pthread' && cmake --build deps/lib/b"],
+                                        // run in the emsdk container from the source root, BEFORE
+                                        // sources are globbed (codegen, configure, static deps)
+  "test": {                             // optional test-module.mjs overrides
+    "transport": true,                  // run Move's transport (default: midi_fx only)
+    "params": {"preset": "3"},          // set_param after create_instance
+    "create_json": {"pack": "…"},       // 2nd argument of create_instance
+    "audio_in": true,                   // generators: feed the saw into the mailbox audio-in
+    "seconds": 4,
+    "wait_ms": 2000,                    // after create_instance, wait (pumping proxied calls) for loader threads
+    "realtime": true,                   // pace rendering at real time (DSP built on a worker)
+    "notes": [68, 69] },                // or [[t, status, d1, d2], …]: replaces the default stimulus
   "skip": false, "skip_reason": "…"
 }
 ```
@@ -159,7 +183,32 @@ float→int); fewer than 50% of samples at full scale; for MIDI FX, at least one
 note-on comes out. For audio FX the result also reports `wet-dry`, the level of
 (out - in), so a pass-through FX is visible.
 
+Demo content: only content shipped in the module's own repo (under its licence),
+content generated procedurally in `pre_build`, or sha256-pinned downloads of
+CC0, public-domain or MIT files with the licence recorded. Never Move factory
+content, and never ROMs.
+
 ## Notes for the engine (main module)
+
+- **Stack.** Emscripten's default stack is 64 KB for the main thread and every
+  pthread; the device has 8 MB. `forge` puts more than 256 KB of structs on the
+  stack in `create_instance`/`render`. The test host links with
+  `-sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB`, and the engine should
+  too, at least for the loader and device threads.
+- **sched/pthread_setname_np.** Emscripten's libc has no `sched_setscheduler`,
+  `sched_{get,set}{scheduler,param,affinity}` or `pthread_setname_np`. Module
+  workers call these as the documented demote-to-SCHED_OTHER pattern. Modules
+  get no-op versions from `compat/include/schwung_module_prelude.h`. Engine
+  code that calls them needs the same.
+- **Memory growth plus threads.** One run of `tablor` with `--threaded` trapped
+  with "memory access out of bounds" while its loader thread was allocating
+  under `ALLOW_MEMORY_GROWTH`, and was clean with a fixed 1 GB
+  `INITIAL_MEMORY`. A later run with growth also passed. Prefer a pre-sized
+  heap in the engine.
+- **dlopen.** `wasm_compat.h` maps `dlopen` to `schwung_wasm_dlopen`
+  (`engine/dlsync.c`, which waits for the device thread to sync). The test host
+  defines it as a plain passthrough, so modules that dlopen something
+  themselves import `schwung_wasm_dlopen` and link in both hosts.
 
 - **Exports.** `MAIN_MODULE=1` exports all of libc, so it just works. With
   `MAIN_MODULE=2` the engine must export at least every symbol listed in
@@ -201,6 +250,7 @@ note-on comes out. For audio FX the result also reports `wet-dry`, the level of
 
 ## Built modules
 
+<!-- TABLE -->
 Status: default run / `--threaded` run. Latest results are in `build/module-test/results.json`.
 
 | id | type | repo @ pin | licence | dsp | test | level | notes |

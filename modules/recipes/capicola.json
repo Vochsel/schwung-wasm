@@ -1,0 +1,38 @@
+{
+  "id": "capicola",
+  "repo": "charlesvestal/schwung-capicola",
+  "commit": "ab8b72d0b741c2ce37589f64bb7323db47fa99f5",
+  "license": "AGPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "pre_build": [
+    "bash scripts/apply_patches.sh"
+  ],
+  "sources": [
+    "src/dsp/capicola_plugin.cpp",
+    "src/dsp/capicola_engine.cpp",
+    "src/dsp/capicola_params.cpp"
+  ],
+  "include": [
+    "build/lib",
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17",
+    "-ffast-math"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "capicola.so",
+  "upstream_build": "scripts/build.sh: scripts/apply_patches.sh (copies src/dsp/lib/*.h to build/lib and applies patches/*.patch), then g++ -std=c++17 -Ofast -DNDEBUG capicola_{plugin,engine,params}.cpp -Ibuild/lib -Isrc/dsp; dist/capicola/{module.json,help.json,capicola.so}"
+}

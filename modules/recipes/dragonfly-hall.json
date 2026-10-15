@@ -1,0 +1,60 @@
+{
+  "id": "dragonfly-hall",
+  "repo": "wolfrenegade1976/move-anything-dragonfly-hall",
+  "commit": "4ab76d0f0ecd3b418091c8b3b3ceb2666ba54cd8",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "extra_repos": [
+    {
+      "repo": "michaelwillis/dragonfly-reverb",
+      "commit": "772cb2a7e6244aef7cd68188392ef6924a479dcc",
+      "dir": "dragonfly-reverb",
+      "submodules": true
+    }
+  ],
+  "sources": [
+    "src/dsp/hall_plugin.cpp",
+    "dragonfly-reverb/plugins/dragonfly-hall-reverb/DSP.cpp",
+    "dragonfly-reverb/common/kiss_fft/kiss_fft.c",
+    "dragonfly-reverb/common/kiss_fft/kiss_fftr.c",
+    "dragonfly-reverb/common/freeverb/allpass.cpp",
+    "dragonfly-reverb/common/freeverb/biquad.cpp",
+    "dragonfly-reverb/common/freeverb/comb.cpp",
+    "dragonfly-reverb/common/freeverb/delay.cpp",
+    "dragonfly-reverb/common/freeverb/delayline.cpp",
+    "dragonfly-reverb/common/freeverb/earlyref.cpp",
+    "dragonfly-reverb/common/freeverb/efilter.cpp",
+    "dragonfly-reverb/common/freeverb/nrev.cpp",
+    "dragonfly-reverb/common/freeverb/nrevb.cpp",
+    "dragonfly-reverb/common/freeverb/progenitor.cpp",
+    "dragonfly-reverb/common/freeverb/progenitor2.cpp",
+    "dragonfly-reverb/common/freeverb/revbase.cpp",
+    "dragonfly-reverb/common/freeverb/slot.cpp",
+    "dragonfly-reverb/common/freeverb/strev.cpp",
+    "dragonfly-reverb/common/freeverb/utils.cpp",
+    "dragonfly-reverb/common/freeverb/zrev.cpp",
+    "dragonfly-reverb/common/freeverb/zrev2.cpp"
+  ],
+  "include": [
+    "dragonfly-reverb/plugins/dragonfly-hall-reverb",
+    "dragonfly-reverb/common",
+    "dragonfly-reverb/dpf/distrho"
+  ],
+  "defines": [
+    "LIBFV3_FLOAT"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14",
+    "-w",
+    "-Wno-deprecated"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dragonfly-hall.so",
+  "upstream_build": "Dockerfile: clone michaelwillis/dragonfly-reverb tag 3.2.10 (+submodules), make -C plugins/dragonfly-hall-reverb (DSP objects only used), g++ -O2 -fPIC -std=c++14 hall_plugin.cpp -I plugin dir -I common -I dpf/distrho, link with DSP.cpp.o common/freeverb/*.cpp.o common/kiss_fft/*.o; release.yml: dist/dragonfly-hall/{dragonfly-hall.so,module.json} (src/ui.js is NOT shipped)",
+  "wasm_notes": "Upstream compiles hall_plugin.cpp without -DLIBFV3_FLOAT while DSP.cpp/freeverb get it; here every TU gets LIBFV3_FLOAT so the fv3 types in DSP.hpp have one layout."
+}

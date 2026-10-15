@@ -39,16 +39,11 @@ const COLOR_TABLE = [
   [0xFFFFFF,124],[0x595959,124],[0xCCCCCC,125],[0x404040,125],[0x141414,126],
   [0x0000FF,126],[0x00FF00,127],[0xFF0000,127],
 ];
-export const palette = (v) => {
-  if (v <= 0 || v > 127) return null;
-  const h = COLOR_TABLE[v][0];
-  return [(h >> 16) & 255, (h >> 8) & 255, h & 255];
-};
-const white = (v) => {
-  if (v <= 0 || v > 127) return null;
-  const b = Math.round(COLOR_TABLE[v][1] / 127 * 255);
-  return [b, b, b];
-};
+// Precomputed (shared, treat as read-only) so LED polling allocates nothing.
+const PAL = COLOR_TABLE.map(([h]) => Object.freeze([(h >> 16) & 255, (h >> 8) & 255, h & 255]));
+const WHITE = COLOR_TABLE.map(([, w]) => { const b = Math.round(w / 127 * 255); return Object.freeze([b, b, b]); });
+export const palette = (v) => (v <= 0 || v > 127 ? null : PAL[v]);
+export const white = (v) => (v <= 0 || v > 127 ? null : WHITE[v]);
 
 /* ---------------- geometry (logical units, after mirror.html) ---------------- */
 export const W = 920;
@@ -143,6 +138,39 @@ function roundRect(ctx, x, y, w, h, r) {
 }
 const ANIM_MS_120 = [500 / 6, 125, 250, 500, 1000];   // 24th 16th 8th 4th half @120
 
+/* ---------------- shared input gestures (2D panel and 3D view) ----------------
+ * Both views feed these the same pointer data so they send identical MIDI. */
+/** Pad velocity: real pen/touch pressure when present, else from where the pad
+ *  was hit (`frac` 0 = top edge -> 127, 0.5 = centre -> 100, 1 = bottom -> 73). */
+export function padVelocity(e, frac) {
+  if (e.pointerType !== 'mouse' && e.pressure > 0 && e.pressure !== 0.5) return Math.round(20 + e.pressure * 107);
+  return Math.round(127 - Math.max(0, Math.min(1, frac)) * 54);
+}
+/** Vertical knob drag: `dy` px upward since the last move. Accelerates with
+ *  speed, `fine` (Shift) = quarter speed. Returns whole ticks to send. */
+export function knobDragTicks(st, dy, fine) {
+  const accel = 1 + Math.min(4, Math.abs(dy) / 5);
+  st.acc += dy * accel * (fine ? 0.25 : 1);
+  const ticks = Math.trunc(st.acc / 3);
+  st.acc -= ticks * 3;
+  return ticks;
+}
+/** Jog drag around the rim: `a` = pointer angle around the centre (screen
+ *  space, y down, so clockwise is positive). One detent per 15 degrees. */
+export function jogDragTicks(st, a) {
+  if (st.angle === null) { st.angle = a; return 0; }
+  let da = a - st.angle;
+  if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
+  st.angle = a;
+  st.acc += da;
+  const STEP = Math.PI / 12;
+  const ticks = Math.trunc(st.acc / STEP);
+  st.acc -= ticks * STEP;
+  return ticks;
+}
+/** Wheel event -> signed ticks (up = clockwise). */
+export const wheelTicks = (e) => (e.deltaY < 0 ? 1 : -1) * Math.max(1, Math.min(10, Math.round(Math.abs(e.deltaY) / (e.deltaMode ? 1 : 40))));
+
 /* ================================================================ Panel */
 export class Panel {
   /**
@@ -163,6 +191,8 @@ export class Panel {
     this.knobPos = new Map();    // control id -> visual rotation ticks
     this.wheelTimers = new Map();
     this.dirty = true;
+    this.rev = 0;                // bumps on every held/turn change (the 3D view watches it)
+    this.hidden = false;         // true while the 3D view is shown: skip 2D OLED rendering
     this.lastDisplaySeq = -1; this.lastLedSeq = -1;
     this.oled = document.createElement('canvas');
     this.oledImg = null;
@@ -204,7 +234,7 @@ export class Panel {
     const isDown = this.held.has(id);
     if (down === isDown) return;
     if (down) this.held.set(id, { vel, at: 0 }); else this.held.delete(id);
-    this.dirty = true;
+    this.dirty = true; this.rev++;
     switch (c.kind) {
       case 'pad': down ? this._send(0x90, c.note, Math.max(1, Math.min(127, vel | 0))) : this._send(0x80, c.note, 0); break;
       case 'step': down ? this._send(0x90, c.note, 127) : this._send(0x80, c.note, 0); break;
@@ -219,7 +249,7 @@ export class Panel {
     if (down === this.held.has(key)) return;
     if (down) this.held.set(key, {}); else this.held.delete(key);
     down ? this._send(0x90, c.touch, 127) : this._send(0x80, c.touch, 0);
-    this.dirty = true;
+    this.dirty = true; this.rev++;
   }
   /** Turn a knob / the jog by relative ticks (+ = clockwise). */
   turn(id, ticks) {
@@ -227,7 +257,7 @@ export class Panel {
     let t = Math.round(ticks);
     this.knobPos.set(id, (this.knobPos.get(id) || 0) + t);
     while (t !== 0) { const s = Math.max(-63, Math.min(63, t)); this._send(0xb0, c.cc, this._rel(s)); t -= s; }
-    this.dirty = true;
+    this.dirty = true; this.rev++;
   }
   /** Wheel-style turn: touch on, turn, touch off after idle. */
   nudge(id, ticks) {
@@ -284,10 +314,7 @@ export class Panel {
       this.pointers.set(e.pointerId, st);
       this.io.onHover?.(null);
       if (c.kind === 'pad') {
-        let vel;
-        if (e.pointerType !== 'mouse' && e.pressure > 0 && e.pressure !== 0.5) vel = 20 + e.pressure * 107;
-        else { const f = (p.y - c.y) / c.h; vel = 127 - Math.max(0, Math.min(1, f)) * 54; } // top 127, centre 100
-        this.press(c.id, true, Math.round(vel));
+        this.press(c.id, true, padVelocity(e, (p.y - c.y) / c.h));
       } else if (c.kind === 'knob') {
         this.press(c.id, true);
       } else if (c.kind === 'jog') {
@@ -310,22 +337,13 @@ export class Panel {
       const c = st.c;
       if (c.kind === 'knob') {
         const dy = st.lastY - e.clientY; st.lastY = e.clientY;
-        const accel = 1 + Math.min(4, Math.abs(dy) / 5);
-        st.acc += dy * accel * (e.shiftKey ? 0.25 : 1);
-        const ticks = Math.trunc(st.acc / 3);
-        if (ticks) { st.acc -= ticks * 3; this.turn(c.id, ticks); }
+        const ticks = knobDragTicks(st, dy, e.shiftKey);
+        if (ticks) this.turn(c.id, ticks);
       } else if (c.kind === 'jog') {
         const p = this.toLogical(e);
         if (Math.hypot(p.x - c.cx, p.y - c.cy) < c.r * 0.3) { st.angle = null; return; }
-        const a = Math.atan2(p.y - c.cy, p.x - c.cx);
-        if (st.angle === null) { st.angle = a; return; }
-        let da = a - st.angle;
-        if (da > Math.PI) da -= 2 * Math.PI; else if (da < -Math.PI) da += 2 * Math.PI;
-        st.acc += da;
-        const STEP = Math.PI / 12;                    // 15 degrees per detent
-        const ticks = Math.trunc(st.acc / STEP);
-        if (ticks) { st.acc -= ticks * STEP; this.turn(c.id, ticks); }
-        st.angle = a;
+        const ticks = jogDragTicks(st, Math.atan2(p.y - c.cy, p.x - c.cx));
+        if (ticks) this.turn(c.id, ticks);
       } else if (c.kind === 'pad' && e.pointerType !== 'mouse' && e.pressure > 0) {
         this.aftertouch(c.id, e.pressure * 127);
       }
@@ -345,8 +363,7 @@ export class Panel {
       const p = this.toLogical(e), c = this.hit(p.x, p.y);
       if (!c || (c.kind !== 'knob' && c.kind !== 'jog')) return;
       e.preventDefault();
-      const mag = Math.max(1, Math.min(10, Math.round(Math.abs(e.deltaY) / (e.deltaMode ? 1 : 40))));
-      this.nudge(c.id, (e.deltaY < 0 ? 1 : -1) * mag);
+      this.nudge(c.id, wheelTicks(e));
     }, { passive: false });
   }
 
@@ -386,7 +403,7 @@ export class Panel {
     this.lastDisplaySeq = seq;
     this.oledBits.set(src.display());
     this.oledOn = true;
-    this._renderOled(false);
+    if (!this.hidden) this._renderOled(false);
     return true;
   }
   // Render the 128x64 frame into a device-pixel canvas, one crisp block per
@@ -598,12 +615,17 @@ export class Panel {
   }
 
   /** Called every animation frame. Returns true if it redrew. */
+  /** Poll the engine: bit 1 = new OLED frame (in oledBits), bit 2 = LEDs changed. */
+  poll() {
+    if (!this.src) return 0;
+    let r = this._pollDisplay() ? 1 : 0;
+    const ls = this.src.ledsSeq?.();
+    if (ls !== undefined && ls !== this.lastLedSeq) { this.lastLedSeq = ls; r |= 2; }
+    return r;
+  }
+
   frame(now) {
-    if (this.src) {
-      if (this._pollDisplay()) this.dirty = true;
-      const ls = this.src.ledsSeq?.();
-      if (ls !== undefined && ls !== this.lastLedSeq) { this.lastLedSeq = ls; this.dirty = true; }
-    }
+    if (this.poll()) this.dirty = true;
     if (!this.dirty && !this.animating) return false;
     this.dirty = false;
     this.draw(now);

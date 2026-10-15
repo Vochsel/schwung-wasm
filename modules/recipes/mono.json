@@ -1,0 +1,36 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "mono",
+  "repo": "timncox/schwung-mono",
+  "commit": "ce377749c32d9cb29060f98fc8e671aa1af73bbc",
+  "license": "MIT",
+  "component_type": "overtake",
+  "category_dir": "overtake",
+  "sources": [
+    "src/mono_core.c",
+    "src/mono_overtake.c"
+  ],
+  "include": [
+    "include",
+    "src"
+  ],
+  "assets": [
+    "modules/overtake/mono/module.json",
+    {
+      "from": "src/ui_overtake.js",
+      "to": "ui.js"
+    },
+    {
+      "from": "src/help_mono.json",
+      "to": "help.json"
+    },
+    "src/web_ui.html"
+  ],
+  "test": {
+    "transport": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude -Isrc src/mono_core.c src/mono_overtake.c -lm; mono/{module.json,dsp.so,ui.js(=ui_overtake.js),help.json(=help_mono.json),web_ui.html}"
+}

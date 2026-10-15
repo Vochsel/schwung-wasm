@@ -1,0 +1,25 @@
+{
+  "id": "magneto",
+  "repo": "filliformes/magneto-move",
+  "commit": "4305a8f2822950479e45b22d97129f46cde38f48",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/*.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/help.json"
+  ],
+  "so_name": "magneto.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -ffast-math src/dsp/*.c -Isrc/dsp -lm -lpthread; dist/magneto/{magneto.so,module.json,help.json}"
+}

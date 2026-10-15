@@ -1,0 +1,42 @@
+{
+  "defines": [],
+  "cflags": [
+    "-std=c11",
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "tuner",
+  "repo": "CatsAreCool710/Move-Everything-Tuner",
+  "commit": "b8b8d6b29e37bc86e40c97c15e0d0c6ce791c277",
+  "license": "GPL-3.0",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/tuner_plugin.c",
+    "src/dsp/tuner_engine.c",
+    "src/dsp/tuner_audio.c"
+  ],
+  "include": [
+    "src"
+  ],
+  "pre_build": [
+    "mkdir -p .wasm-stage && grep -v '/\\*DEBUG\\*/' src/ui.js > .wasm-stage/ui.js"
+  ],
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    {
+      "from": ".wasm-stage/ui.js",
+      "to": "ui.js"
+    }
+  ],
+  "test": {
+    "audio_in": true,
+    "params": {
+      "passthrough": "on",
+      "passthrough_volume": "80"
+    }
+  },
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O3 -ffast-math -flto -shared -fPIC tuner_plugin.c tuner_engine.c tuner_audio.c -Isrc; dist/tuner/{dsp.so,module.json,help.json,ui.js (DEBUG lines stripped)}"
+}

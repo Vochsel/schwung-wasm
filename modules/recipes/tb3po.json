@@ -1,0 +1,32 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "tb3po",
+  "repo": "charlesvestal/schwung-tb3po",
+  "commit": "f49d81d05d1e29ae37728a08e30f193892be3bc9",
+  "license": "GPL-3.0",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/tb3po.c"
+  ],
+  "include": [],
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    "src/params.mjs",
+    "src/lane.mjs",
+    "src/pad_map.mjs",
+    "src/pages.mjs",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "test": {
+    "transport": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -O2 -fPIC -shared src/dsp/tb3po.c; dist/tb3po/{dsp.so,module.json,ui.js,params.mjs,lane.mjs,pad_map.mjs,pages.mjs,help.json}"
+}

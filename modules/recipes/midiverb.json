@@ -1,0 +1,18 @@
+{
+  "id": "midiverb",
+  "repo": "charlesvestal/schwung-midiverb",
+  "commit": "ae0e91ba47e18ae551825d2b1de869cebd9f1d7c",
+  "license": "GPL-3.0-or-later",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/plugin.c", "src/dsp/midiverb_core.c", "src/dsp/resampler.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": ["-ffast-math"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}, "LICENSE", "NOTICE",
+             "src/dsp/THIRD_PARTY_LICENSES.md"],
+  "so_name": "midiverb.so",
+  "wasm_notes": "No ROM file: the Midiverb/Midifex/Midiverb II programs ship in the repo as decompiled C (decompiled-*.h, from thement/midiverb_emulator, GPL-3.0). Redistribution follows upstream's licensing; worth a legal glance since it derives from the unit's ROM.",
+  "upstream_build": "scripts/build.sh: gcc -O3 -ffast-math -DNDEBUG -Isrc/dsp plugin.c midiverb_core.c resampler.c -shared -o midiverb.so; dist/midiverb/{module.json,help.json,midiverb.so,LICENSE,NOTICE,THIRD_PARTY_LICENSES.md}"
+}

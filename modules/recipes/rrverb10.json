@@ -1,0 +1,19 @@
+{
+  "id": "rrverb10",
+  "repo": "legsmechanical/schwung-rrverb10",
+  "commit": "a8cbbb9dac001baefe847c017eec4b36d310c717",
+  "license": "LGPL-2.1",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/rrverb10.cpp", "src/dsp/BossEmu.cpp"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": [],
+  "cxx": true,
+  "pre_build": ["mkdir -p .wasm-demo/roms && printf '%s\\n' 'Place your own dump of the unit'\"'\"'s 16 KB program ROM here as:' '    rrv10.bin      (16384 bytes, crc32 4B1D6D75)' 'It is not distributed with this module. Until it is present the effect loads' 'and passes audio through unprocessed, and the module reports the missing file.' > .wasm-demo/roms/README.txt"],
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}, "LICENSE",
+             {"from": ".wasm-demo/roms/README.txt", "to": "roms/README.txt"}],
+  "so_name": "rrverb10.so",
+  "wasm_notes": "Needs a user-supplied, non-redistributable 16 KB program ROM at <module_dir>/roms/rrv10.bin (upload flow). Without it the module passes audio through unchanged, which is what the test sees.",
+  "upstream_build": "scripts/build.sh: g++ -O3 -DNDEBUG -shared rrverb10.cpp BossEmu.cpp -Isrc/dsp; dist/rrverb10/{module.json,help.json,LICENSE,rrverb10.so,roms/README.txt}"
+}

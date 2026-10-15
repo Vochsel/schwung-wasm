@@ -1,0 +1,26 @@
+{
+  "id": "denis",
+  "repo": "filliformes/denis-move",
+  "commit": "da7fb7fe095f07aeda6e6056fb78d361c68862df",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/denis.c"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -ffast-math src/dsp/denis.c -lm; dist/denis/{dsp.so,module.json,help.json}",
+  "wasm_notes": "Maps /dev/shm shadow-control for Shift detection; open() fails in the browser VFS and the module falls back to shadow_ctrl=NULL (Shift combos unavailable). No patch needed."
+}

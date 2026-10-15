@@ -1,0 +1,51 @@
+{
+  "id": "clementine-xt",
+  "repo": "sd88me/schwung-clementineXT",
+  "commit": "6577e1f412e2b59671430de20222614f0d23ef9d",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "pre_build": [
+    "mkdir -p build && python3 tools/gen_schwung.py && python3 tools/gen_web_ui.py"
+  ],
+  "sources": [
+    "engine/engine.c",
+    "engine/out.c",
+    "engine/patch.c",
+    "engine/syx.c",
+    "engine/waves.c",
+    "engine/wavedata.c",
+    "engine/filter.c",
+    "engine/fx.c",
+    "engine/mod.c",
+    "engine/presets.c",
+    "engine/factory.c",
+    "src/schwung_plugin.c"
+  ],
+  "include": [
+    "engine",
+    "vendor/schwung",
+    "vendor/mpc-vst-plugins",
+    "src"
+  ],
+  "defines": [
+    "_GNU_SOURCE"
+  ],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "module.json",
+    "help.json",
+    "web/web_ui.html",
+    {
+      "from": "web/assets/*",
+      "to": "assets/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: python3 tools/gen_schwung.py (writes module.json, src/schwung_meta.h) + tools/gen_web_ui.py; gcc -O2 -Iengine -Ivendor/schwung -Ivendor/mpc-vst-plugins -Isrc engine/*.c src/schwung_plugin.c -lpthread; dist {module.json,help.json,web_ui.html,assets/*,dsp.so}",
+  "wasm_notes": "-D_GNU_SOURCE (sched_setscheduler/sched_setaffinity no-ops now come from compat/include/schwung_module_prelude.h): the worker thread calls sched_setscheduler/sched_setaffinity (demote from SCHED_FIFO, keep off core 3). musl only declares them under _GNU_SOURCE, and Emscripten's libc omits musl src/sched entirely, so without the hidden-visibility no-op stubs the worker traps on an unresolved import. Engine is created on the worker thread; silent until it is up (~100 ms), so the 40x-faster-than-realtime test needs realtime pacing (test.realtime, not yet implemented by testhost). Verified audible (-24 dBFS rms) with a paced host, default and threaded.",
+  "test": {
+    "realtime": true
+  }
+}

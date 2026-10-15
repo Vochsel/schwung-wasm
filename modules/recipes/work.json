@@ -1,0 +1,17 @@
+{
+  "id": "work",
+  "repo": "timncox/schwung-work",
+  "commit": "c88ec1503da7835ae9b9b1270e5f07659bd6b72b",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/work_core.c", "src/work_fx.c"],
+  "include": ["include", "src"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["modules/audio_fx/work/module.json", "src/ui_chain.js", "src/sample_io.mjs",
+             {"from": "src/help_work.json", "to": "help.json"}],
+  "so_name": "work.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Wpedantic -Iinclude -Isrc src/work_core.c src/work_fx.c -o work.so; build/modules/audio_fx/work/{module.json,ui_chain.js,sample_io.mjs,help.json(=help_work.json),work.so}"
+}

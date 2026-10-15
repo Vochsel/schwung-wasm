@@ -1,0 +1,40 @@
+{
+  "id": "setbfree-organ",
+  "repo": "pdubucq/schwung-setbfree",
+  "commit": "53834bd56d895fe3b12c53c663548b902fdc5fd5",
+  "license": "GPL-2.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "pre_build": [],
+  "sources": [
+    "src/setbfree/*.c",
+    "src/schwung_bfree/schwung_wrapper.c",
+    "src/schwung_bfree/schwung_bfree.c",
+    "src/schwung_bfree/setbfree_stubs.c"
+  ],
+  "include": [
+    "src/setbfree",
+    "src/host",
+    "src/schwung_bfree",
+    "src"
+  ],
+  "defines": [
+    "NDEBUG",
+    "_GNU_SOURCE"
+  ],
+  "cflags": [
+    "-std=c99",
+    "-fvisibility=hidden"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/schwung_bfree/module.json",
+    "src/schwung_bfree/help.json"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt target dsp: C99 -O3 -fvisibility=hidden -DNDEBUG src/setbfree/*.c + src/schwung_bfree/{schwung_wrapper,schwung_bfree,setbfree_stubs}.c, -Isrc/setbfree -Isrc/host -Isrc/schwung_bfree -Isrc; dist/setbfree-organ/{dsp.so,module.json,help.json}",
+  "wasm_notes": "-D_GNU_SOURCE (sched_setscheduler/sched_setaffinity no-ops now come from compat/include/schwung_module_prelude.h): the worker thread calls sched_setscheduler/sched_setaffinity (demote from SCHED_FIFO, keep off core 3). musl only declares them under _GNU_SOURCE, and Emscripten's libc omits musl src/sched entirely, so without the hidden-visibility no-op stubs the worker traps on an unresolved import. Organ is built on the init worker; silent until `ready`, so the test needs realtime pacing (test.realtime, not yet implemented by testhost). Verified audible (-20.6 dBFS rms) with a paced host, default and threaded.",
+  "test": {
+    "realtime": true
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "id": "keydetect",
+  "repo": "charlesvestal/schwung-keydetect",
+  "commit": "66b613075cefcde57bc00c51194db81915039ce4",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "extra_repos": [
+    {
+      "repo": "mixxxdj/libkeyfinder",
+      "commit": "b33b5a88e04a5182dd19c38c57762925631118fd",
+      "dir": "deps/libkeyfinder"
+    }
+  ],
+  "downloads": [
+    {
+      "url": "https://www.fftw.org/fftw-3.3.10.tar.gz",
+      "sha256": "56c932549852cddcfafdab3820b0200c7742675be92179e59e6215b340e26467",
+      "to": "deps/fftw",
+      "src": true,
+      "license": "GPL-2.0-or-later"
+    }
+  ],
+  "pre_build": [
+    "cd deps/fftw/fftw-3.3.10 && emconfigure ./configure --prefix=$OLDPWD/.wasm-deps --enable-static --disable-shared --disable-fortran --disable-doc --with-pic CFLAGS='-O2 -fPIC -pthread' > ../configure.log 2>&1 && emmake make -j8 > ../make.log 2>&1 && emmake make install > ../install.log 2>&1",
+    "emcmake cmake -S deps/libkeyfinder -B .wasm-deps/kf-build -DBUILD_SHARED_LIBS=OFF -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DFFTW3_LIBRARY=$PWD/.wasm-deps/lib/libfftw3.a -DFFTW3_INCLUDE_DIR=$PWD/.wasm-deps/include -DCMAKE_INSTALL_PREFIX=$PWD/.wasm-deps -DCMAKE_C_FLAGS=\"-pthread -fPIC\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC\" > .wasm-deps/kf-cmake.log 2>&1 || { tail -30 .wasm-deps/kf-cmake.log; exit 1; }; cmake --build .wasm-deps/kf-build -j8 && cmake --install .wasm-deps/kf-build"
+  ],
+  "sources": [
+    "src/dsp/keyfinder_wrapper.cpp",
+    "src/dsp/keydetect.c"
+  ],
+  "include": [
+    "src/dsp",
+    ".wasm-deps/include"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [
+    "-std=c++11",
+    "-ffast-math"
+  ],
+  "ldflags": [
+    ".wasm-deps/lib/libkeyfinder.a",
+    ".wasm-deps/lib/libfftw3.a"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "keydetect.so",
+  "upstream_build": "scripts/Dockerfile builds FFTW 3.3.10 (static, --with-pic) and libkeyfinder 2.2.8 (static, PIC) for aarch64; scripts/build.sh: g++ -Ofast -std=c++11 keyfinder_wrapper.cpp, gcc -Ofast keydetect.c, link -lkeyfinder -lfftw3 -static-libstdc++; dist/keydetect/{module.json,help.json,keydetect.so}"
+}

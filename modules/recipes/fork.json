@@ -1,0 +1,36 @@
+{
+  "id": "fork",
+  "repo": "andree182/schwung-fork",
+  "commit": "181d332f9a221151dc008fd5abc3a3bf426c7199",
+  "license": "GPL-3.0",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": [
+    "src/dsp/fork.c"
+  ],
+  "include": [
+    "src",
+    "src/dsp"
+  ],
+  "include_abs": [
+    "/w/build/schwung/src"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/chain_patches/*.json",
+      "to": "chain_patches/",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build-module.sh: gcc -O3 -fPIC -shared -Isrc -Isrc/dsp -I$MOVE_ANYTHING_SRC src/dsp/fork.c (MOVE_ANYTHING_SRC = Schwung src/, here build/schwung/src); dist/fork/{module.json,help.json,dsp.so,chain_patches/*.json}",
+  "wasm_notes": "io pthread for path persistence; glibc .symver pins are already #if defined(__aarch64__) so they vanish on wasm (no patch)."
+}

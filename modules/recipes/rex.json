@@ -1,0 +1,24 @@
+{
+  "id": "rex",
+  "repo": "charlesvestal/schwung-rex",
+  "commit": "c46ed640bcbd9d9c31a9b2b1e73590ab113abdb6",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/rex_plugin.c", "src/dsp/dwop.c", "src/dsp/rex_parser.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": [],
+  "cxx": false,
+  "pre_build": [
+    "python3 /w/modules/demo/gen_demo_samples.py .wasm-demo/samples",
+    "emcc -O1 -DNDEBUG -Isrc/dsp -sNODERAWFS=1 src/dsp/rex_encode_main.c src/dsp/dwop_encode.c src/dsp/dwop.c src/dsp/wav_reader.c src/dsp/rex_writer.c src/dsp/rex_parser.c -o .wasm-demo/rex-encode.js",
+    "node .wasm-demo/rex-encode.js .wasm-demo/samples/loop-120bpm.wav .wasm-demo/schwung-wasm-demo-loop.rx2 0,11025,22050,33075,44100,55125,66150,77175,88200,99225,110250,121275,132300,143325,154350,165375,176400 120"
+  ],
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}, "src/ui.js", {"mkdir": "loops"},
+             {"from": ".wasm-demo/schwung-wasm-demo-loop.rx2", "to": "loops/schwung-wasm-demo-loop.rx2"}],
+  "so_name": "dsp.so",
+  "demo_content": "loops/schwung-wasm-demo-loop.rx2: modules/demo/gen_demo_samples.py loop (original, CC0-1.0) encoded at build time with the repo's own rex-encode (compiled with emcc, run under node)",
+  "wasm_notes": "The release also ships rex-encode, an aarch64 CLI used by the UI to convert WAVs on-device; it is not part of the wasm module (no exec in the browser).",
+  "upstream_build": "scripts/build.sh: gcc -O3 -DNDEBUG -shared rex_plugin.c dwop.c rex_parser.c -Isrc/dsp; dist/rex/{module.json,help.json,ui.js,dsp.so,rex-encode,loops/}"
+}

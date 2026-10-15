@@ -53,12 +53,13 @@ function ensureTestHost() {
     if (p.status !== 0) throw new Error('prepare.sh failed');
   }
   const inputs = ['modules/testhost/testhost.c', 'modules/testhost/pre.js', 'compat/wasm_compat.h',
+    'compat/include/schwung_module_prelude.h',
     'build/schwung/src/host/plugin_api_v1.h', 'build/schwung/src/host/audio_fx_api_v2.h',
     'build/schwung/src/host/midi_fx_api_v1.h'];
   const h = crypto.createHash('sha256');
   for (const f of inputs) h.update(fs.readFileSync(path.join(ROOT, f)));
   const flags = '-O2 -pthread -sMAIN_MODULE=1 -sEXIT_RUNTIME=1 -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 '
-    + '-sMAXIMUM_MEMORY=2147483648 -sPTHREAD_POOL_SIZE=4 -sENVIRONMENT=node,worker -lnodefs.js';
+    + '-sMAXIMUM_MEMORY=2147483648 -sPTHREAD_POOL_SIZE=8 -sSTACK_SIZE=1MB -sDEFAULT_PTHREAD_STACK_SIZE=1MB -sENVIRONMENT=node,worker -lnodefs.js';
   h.update(flags);
   const stamp = h.digest('hex');
   // Content-addressed output dir, built in a temp dir and renamed into place,
@@ -77,6 +78,15 @@ function ensureTestHost() {
   const r = run(path.join(ROOT, 'scripts/em'), ['bash', '-c', sh]);
   if (r.status !== 0) { process.stderr.write(r.stdout + r.stderr); fs.rmSync(tmp, { recursive: true, force: true }); throw new Error('test host build failed'); }
   try { fs.renameSync(tmp, dir); } catch { fs.rmSync(tmp, { recursive: true, force: true }); } // lost the race: fine
+}
+
+// test.notes: [[t, status, d1, d2], ...] or plain note numbers (each played
+// for 0.2 s, one every 0.25 s, velocity 110)
+function notesEnv(notes) {
+  if (!notes || !notes.length) return '';
+  const ev = notes.flatMap((n, i) => Array.isArray(n) ? [n]
+    : [[i * 0.25, 0x90, n, 110], [i * 0.25 + 0.2, 0x80, n, 0]]);
+  return ev.map(e => e.join(',')).join(';');
 }
 
 // ---- main --------------------------------------------------------------------
@@ -112,12 +122,18 @@ for (const id of todo) {
     // test.create_json: string (or object) passed as create_instance's 2nd arg
     // test.audio_in: feed the saw into the mailbox audio-in for generators too
     // test.seconds: render length
+    // test.wait_ms: after create_instance, wait (pumping proxied calls) for loader threads
+    // test.realtime: pace rendering at real time (modules that build DSP on a worker)
+    // test.notes: [[t, status, d1, d2], ...] replaces the default note stimulus
     const params = Object.entries(testCfg.params || {}).map(([k, v]) => `${k}=${v}`).join('\n');
     const cj = testCfg.create_json == null ? '' : typeof testCfg.create_json === 'string' ? testCfg.create_json : JSON.stringify(testCfg.create_json);
     const secs = testCfg.seconds ?? seconds;
     const r = run(process.execPath, [TH_JS, m.type, `${m.path}/${m.dsp}`, m.path, `/out/${id}.wav`, String(secs), transport ? '1' : '0', threaded ? '1' : '0'], {
       env: { ...process.env, TESTHOST_DATA: path.join(VFS, 'data'), TESTHOST_OUT: OUT,
-        TESTHOST_PARAMS: params, TESTHOST_CREATE_JSON: cj, TESTHOST_AUDIO_IN: testCfg.audio_in ? '1' : '0' },
+        TESTHOST_PARAMS: params, TESTHOST_CREATE_JSON: cj, TESTHOST_AUDIO_IN: testCfg.audio_in ? '1' : '0',
+        TESTHOST_REALTIME: testCfg.realtime ? '1' : '0',
+        TESTHOST_WAIT_MS: String(testCfg.wait_ms || 0),
+        TESTHOST_NOTES: notesEnv(testCfg.notes) },
       timeout: timeoutS * 1000,
     });
     const ms = Date.now() - t0;

@@ -1,0 +1,31 @@
+{
+  "id": "monksynth",
+  "repo": "charlesvestal/schwung-monksynth",
+  "commit": "38649a60f7b554419db501edc4f7ece0ad861f6d",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/monksynth_plugin.c",
+    "src/dsp/synth.c",
+    "src/dsp/voice.c",
+    "src/dsp/delay.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    "src/ui/canvas.js",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: python3 scripts/gen_module_json.py (output committed, in sync); gcc -O3 -DNDEBUG src/dsp/{monksynth_plugin,synth,voice,delay}.c -Isrc/dsp; dist/monksynth/{module.json,help.json,canvas.js,LICENSE,NOTICE,dsp.so}"
+}

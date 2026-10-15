@@ -1,0 +1,26 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "chorddex",
+  "repo": "dony01001/ChordDex",
+  "commit": "5e25dad9dd671287bad2289ae5dc3825551c4198",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "dsp/monitor.c"
+  ],
+  "include": [
+    "vendor"
+  ],
+  "assets": [
+    "module.json",
+    "ui.js",
+    "help.json",
+    "LICENSE",
+    "README.md"
+  ],
+  "upstream_build": "build-dsp.sh: gcc -O2 -shared -fPIC dsp/monitor.c -Ivendor; scripts/package.sh: dist/chorddex/{module.json,ui.js,help.json,dsp.so,LICENSE,README.md}"
+}

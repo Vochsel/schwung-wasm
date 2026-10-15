@@ -1,0 +1,28 @@
+{
+  "id": "clap",
+  "name": "Airwindows",
+  "repo": "charlesvestal/schwung-airwindows",
+  "commit": "91a004f15caad4c829b8ffa3571ea9479c23f4a5",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "extra_repos": [{"repo": "baconpaul/airwin2rack", "commit": "8a67b80e04230a5cf40e84d6e8b9a2fd70b13a75", "dir": "deps/airwin2rack"}],
+  "pre_build": [
+    "cd deps/airwin2rack && (git apply --check ../../scripts/patches/airwin_no_skip_empty.patch 2>/dev/null && git apply ../../scripts/patches/airwin_no_skip_empty.patch || true)",
+    "[ -f build-wasm/libairwin-registry.a ] || (emcmake cmake -S deps/airwin2rack -B build-wasm -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS='-pthread -fPIC' -DCMAKE_CXX_FLAGS='-pthread -fPIC' >/dev/null && cmake --build build-wasm --target airwin-registry -j8 >/dev/null)",
+    "mkdir -p wasm-plugins && em++ -O2 -pthread -fPIC -std=c++17 -fvisibility=hidden -fvisibility-inlines-hidden -DNDEBUG -include /w/compat/include/schwung_module_prelude.h -include /w/compat/wasm_compat.h scripts/airwindows_clap_wrapper.cpp -I deps/airwin2rack/src -I third_party/clap/include -sSIDE_MODULE=1 build-wasm/libairwin-registry.a build-wasm/libawdoc_resources.a -o wasm-plugins/Airwindows.clap"
+  ],
+  "sources": ["src/chain_audio_fx/clap_fx.cpp", "src/chain_audio_fx/category_browser.c", "src/dsp/clap_host.c"],
+  "include": ["src", "src/dsp", "src/chain_audio_fx", "third_party/clap/include"],
+  "defines": ["NDEBUG"],
+  "cflags": [],
+  "cxxflags": ["-std=c++14", "-fno-exceptions"],
+  "cxx": true,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true},
+             {"from": "wasm-plugins/Airwindows.clap", "to": "plugins/Airwindows.clap"},
+             "LICENSE", {"from": "LICENSES/*", "to": "LICENSES/"}],
+  "so_name": "clap.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 -fno-exceptions -DNDEBUG clap_fx.cpp category_browser.c clap_host.c -Isrc -Isrc/dsp -Isrc/chain_audio_fx -Ithird_party/clap/include -ldl -> clap.so; scripts/build_airwindows_clap.sh: airwin2rack (patched airwin_no_skip_empty) cmake target airwin-registry + airwindows_clap_wrapper.cpp -> plugins/Airwindows.clap; dist/clap/{module.json,help.json,clap.so,plugins/*.clap,LICENSE,LICENSES/*}",
+  "wasm_notes": "The committed plugins/Airwindows.clap is an aarch64 ELF, so it is rebuilt from airwin2rack (pinned) as a second Emscripten side module at the same path; clap_host.c dlopen()s it at runtime from <module_dir>/plugins.",
+  "test": {"create_json": {"plugin_id": "com.airwindows.Verbity"}, "seconds": 3}
+}

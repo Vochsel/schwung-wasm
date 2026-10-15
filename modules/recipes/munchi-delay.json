@@ -1,0 +1,39 @@
+{
+  "id": "munchi-delay",
+  "repo": "charlesvestal/schwung-munchi-delay",
+  "commit": "37ec68598a830630dfb371d5c314a363828da264",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/munchi_delay.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/tempo/shim",
+    "src/dsp/tempo"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17",
+    "-fvisibility=hidden"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    "README.md",
+    "LICENSE",
+    "THIRD_PARTY.md"
+  ],
+  "so_name": "munchi-delay.so",
+  "upstream_build": "scripts/build.sh: g++ -O2 -std=c++17 -fvisibility=hidden -Isrc/dsp -Isrc/dsp/tempo/shim -Isrc/dsp/tempo src/dsp/munchi_delay.cpp -lpthread; dist/munchi-delay/{module.json,munchi-delay.so,help.json,README.md,LICENSE,THIRD_PARTY.md}",
+  "test": {
+    "params": {
+      "mix": 0.8
+    },
+    "realtime": true
+  },
+  "wasm_notes": "Loader std::thread allocates the 2x480k-sample buffers and publishes `ready`; the FX is dry until then. 'mix' 0.5 (default) is TEMPO's centre/dry position, so the test sets mix=0.8 and needs realtime pacing (test.realtime, not yet implemented by testhost)."
+}

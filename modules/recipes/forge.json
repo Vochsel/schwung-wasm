@@ -1,0 +1,33 @@
+{
+  "id": "forge",
+  "repo": "filliformes/forge-move",
+  "commit": "fc69e18d24035764bb0cb58b066d50b25baa7d3c",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/forge.c"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/movy_config.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -ffast-math -shared -fPIC src/dsp/forge.c -lm -lpthread; dist/forge/{dsp.so,module.json,help.json,movy_config.json}",
+  "test": {
+    "min_stack": 524288
+  },
+  "wasm_notes": "Needs >256 KB (<=512 KB) of stack in create_instance/render (100+ KB structs on the stack; 8 MB on the device). Crashes with Emscripten's 64 KB default stack. test.min_stack is advisory: testhost/engine must link with -sSTACK_SIZE / -sDEFAULT_PTHREAD_STACK_SIZE >= 1 MB."
+}

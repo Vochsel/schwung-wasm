@@ -1,0 +1,12 @@
+--- a/src/dsp/rt.h
++++ b/src/dsp/rt.h
+@@ -62,7 +62,9 @@
+     if (rc == 0 && name && *name) {
+         char nm[16];
+         snprintf(nm, sizeof nm, "%s", name);
++#ifndef __EMSCRIPTEN__ /* schwung-wasm: not implemented in Emscripten libc */
+         pthread_setname_np(*tid, nm);      /* else it inherits "Audio Main" */
++#endif
+     }
+     return rc;
+ }

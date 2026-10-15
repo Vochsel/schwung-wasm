@@ -28,10 +28,22 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <emscripten/threading.h>
+#include <emscripten/emscripten.h>
 
 #include "plugin_api_v1.h"
 #include "audio_fx_api_v2.h"
 #include "midi_fx_api_v1.h"
+
+/* compat/wasm_compat.h maps dlopen -> schwung_wasm_dlopen (engine/dlsync.c,
+ * which also waits for the device thread to sync the new side module). The
+ * test host provides it as a plain passthrough so modules that dlopen
+ * themselves (and this file) still link; --threaded syncs via sem_wait. */
+#ifdef dlopen
+#undef dlopen
+#endif
+EMSCRIPTEN_KEEPALIVE void *schwung_wasm_dlopen(const char *path, int flags) { return dlopen(path, flags); }
 
 #define SR 44100
 #define BLOCK 128
@@ -85,7 +97,34 @@ static const ev_t g_events[] = {
     {1.40, {0x80, 48, 0}}, {1.40, {0x80, 55, 0}}, {1.40, {0x80, 60, 0}},
     {1.40, {0x80, 64, 0}}, {1.40, {0x80, 67, 0}}, {1.40, {0x80, 72, 0}},
 };
-#define N_EVENTS (int)(sizeof(g_events) / sizeof(g_events[0]))
+#define N_EVENTS_DEFAULT (int)(sizeof(g_events) / sizeof(g_events[0]))
+/* TESTHOST_NOTES="t,status,d1,d2;..." replaces the default stimulus. */
+static ev_t g_custom[256];
+static const ev_t *g_ev = g_events;
+static int N_EVENTS = N_EVENTS_DEFAULT;
+static int g_realtime = 0; /* TESTHOST_REALTIME: sleep one block per block */
+/* Sleep without starving module threads: on the main thread, keep running the
+ * proxied-call queue (module workers' file I/O is proxied to it). */
+static void pump_ms(double ms) {
+    double end = emscripten_get_now() + ms;
+    while (emscripten_get_now() < end) {
+        if (emscripten_is_main_runtime_thread()) emscripten_main_thread_process_queued_calls();
+        usleep(500);
+    }
+}
+static void load_custom_notes(void) {
+    const char *s = getenv("TESTHOST_NOTES");
+    if (!s || !*s) return;
+    int n = 0;
+    while (*s && n < 256) {
+        double t; unsigned st, a, b; int used = 0;
+        if (sscanf(s, "%lf,%u,%u,%u%n", &t, &st, &a, &b, &used) != 4) break;
+        g_custom[n++] = (ev_t){t, {(uint8_t)st, (uint8_t)a, (uint8_t)b}};
+        s += used;
+        while (*s == ';' || *s == ' ') s++;
+    }
+    if (n) { g_ev = g_custom; N_EVENTS = n; }
+}
 
 /* A trivial sine poly synth to make midi_fx output audible. */
 typedef struct { int note; double phase; float amp; int on; } voice_t;
@@ -183,7 +222,7 @@ static void render_all(void) {
     int next_ev = 0;
     double saw = 0;
     /* events are not sorted; fire each once when its time passes */
-    char fired[N_EVENTS];
+    char fired[256];
     memset(fired, 0, sizeof fired);
     (void)next_ev;
 
@@ -203,10 +242,11 @@ static void render_all(void) {
             }
         }
         for (int e = 0; e < N_EVENTS; e++) {
-            if (fired[e] || g_events[e].t >= t1) continue;
+            if (fired[e] || g_ev[e].t >= t1) continue;
             fired[e] = 1;
-            send_midi(g_events[e].m, 3);
+            send_midi(g_ev[e].m, 3);
         }
+        if (g_realtime) pump_ms(BLOCK * 1000.0 / SR);
         int16_t *blk = out + (size_t)b * BLOCK * 2;
         /* 110 Hz saw at -6 dBFS for the first 1.5 s, then silence (tail). */
         int16_t in[BLOCK * 2];
@@ -295,6 +335,9 @@ int main(int argc, char **argv) {
     const char *cj = getenv("TESTHOST_CREATE_JSON");
     if (cj && !*cj) cj = NULL;
     g_audio_in = getenv("TESTHOST_AUDIO_IN") && atoi(getenv("TESTHOST_AUDIO_IN"));
+    g_realtime = getenv("TESTHOST_REALTIME") && atoi(getenv("TESTHOST_REALTIME"));
+    load_custom_notes();
+    printf("[testhost] audio_in=%d realtime=%d events=%d create_json=%s\n", g_audio_in, g_realtime, N_EVENTS, cj ? cj : "(null)");
 
 
     if (kind == 0) {
@@ -327,6 +370,11 @@ int main(int argc, char **argv) {
         if (!inst) fail("create_instance", "returned NULL");
     }
     printf("[testhost] loaded %s as %s (kind %d)\n", so, type, kind);
+    /* TESTHOST_WAIT_MS: let loader threads finish after create_instance. */
+    if (getenv("TESTHOST_WAIT_MS") && atoi(getenv("TESTHOST_WAIT_MS")) > 0) {
+        printf("[testhost] waiting %s ms for module threads\n", getenv("TESTHOST_WAIT_MS"));
+        pump_ms(atoi(getenv("TESTHOST_WAIT_MS")));
+    }
     /* TESTHOST_PARAMS: "key=value" lines applied with set_param before render. */
     const char *ps = getenv("TESTHOST_PARAMS");
     if (ps && *ps) {

@@ -1,0 +1,48 @@
+{
+  "id": "tablor",
+  "repo": "athousanddetails/schwung-tablor",
+  "commit": "0662122d065e115f43e2591678d0da710416a0ed",
+  "license": "BSD-3-Clause",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/tablor_plugin.cpp",
+    "src/dsp/engine.cpp",
+    "src/dsp/wt/loader.cpp",
+    "src/ported/wavetable.cpp",
+    "src/ported/audiofilter/ParametricCreator.cpp"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/host",
+    "src/ported"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "src/ui_pages.json",
+    "src/help.json",
+    "src/web_ui.html",
+    {
+      "from": "src/presets/factory.tbl",
+      "to": "presets/"
+    },
+    {
+      "from": "src/wavetables/*",
+      "to": "wavetables/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "demo_content": "wavetables/ (Adventure Kid AKWP, Neu KatalYst) ship in the repo and in its release tarball",
+  "upstream_build": "scripts/docker-build.sh + CMakeLists.txt target tablor (C++17 -O3; tablor_plugin.cpp engine.cpp wt/loader.cpp ported/wavetable.cpp ported/audiofilter/ParametricCreator.cpp; -Isrc -Isrc/dsp -Isrc/host -Isrc/ported); dist/tablor/{dsp.so,module.json,ui_pages.json,help.json,web_ui.html,presets/factory.tbl,wavetables/...}",
+  "test": {
+    "wait_ms": 2000
+  },
+  "wasm_notes": "patch 0001 drops pthread_setname_np (declared by musl, not implemented by Emscripten libc: unresolved at runtime). Wavetables load on a worker thread (async)."
+}

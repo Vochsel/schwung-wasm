@@ -365,8 +365,12 @@ void schwung_wasm_hw_exchange(uint8_t *hw) {
 
 static double now_ms(void) { return emscripten_get_now(); }
 
+void schwung_wasm_dlsync_set_device_thread(void);
+void schwung_wasm_dlsync_poll(void);
+
 static void *device_main(void *arg) {
     (void)arg;
+    schwung_wasm_dlsync_set_device_thread();
     uint8_t *sh = schwung_spi_wasm_shadow();
     double last_read_change = now_ms();
     uint32_t last_read = 0;
@@ -390,6 +394,7 @@ static void *device_main(void *arg) {
             }
             continue;
         }
+        schwung_wasm_dlsync_poll();
         double t0 = now_ms();
         vm_transport();
         vm_write_tx(sh);

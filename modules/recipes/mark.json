@@ -1,0 +1,38 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "mark",
+  "repo": "timncox/schwung-mark",
+  "commit": "a9470f34e2d59bca37708065c347f2fd6ef9084b",
+  "license": "MIT",
+  "component_type": "overtake",
+  "category_dir": "overtake",
+  "sources": [
+    "src/mark_core.c",
+    "src/mark_gen.c"
+  ],
+  "include": [
+    "include"
+  ],
+  "assets": [
+    "modules/overtake/mark/module.json",
+    {
+      "from": "src/ui_overtake.js",
+      "to": "ui.js"
+    },
+    {
+      "from": "src/help_mark.json",
+      "to": "help.json"
+    },
+    "src/web_ui.html"
+  ],
+  "test": {
+    "audio_in": true,
+    "params": {
+      "monitor": "1"
+    }
+  },
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude src/mark_core.c src/mark_gen.c -lm -lpthread -ldl; mark/{module.json,dsp.so,ui.js(=src/ui_overtake.js),help.json(=src/help_mark.json),web_ui.html}"
+}

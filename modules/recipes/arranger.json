@@ -1,0 +1,31 @@
+{
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "arranger",
+  "repo": "chaolue/schwung-arranger",
+  "commit": "c76cae3c71bd349594e6f3ac8ddf2e661bdba54e",
+  "license": "MIT",
+  "component_type": "overtake",
+  "category_dir": "overtake",
+  "sources": [
+    "src/dsp/arranger_engine.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    "src/settings-schema.json",
+    "src/help.json",
+    "LICENSE"
+  ],
+  "test": {
+    "transport": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -Werror -DNDEBUG -Isrc/dsp src/dsp/arranger_engine.c; dist/arranger/{module.json,dsp.so,ui.js,settings-schema.json,help.json,LICENSE}"
+}

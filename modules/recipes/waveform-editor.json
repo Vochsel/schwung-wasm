@@ -1,0 +1,38 @@
+{
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "waveform-editor",
+  "repo": "charlesvestal/schwung-waveform-editor",
+  "commit": "7d53b8e0ac911b4abb293bcd5aa4cf8ddaa0b125",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/plugin.c",
+    "src/dsp/dwop.c",
+    "src/dsp/rex_parser.c",
+    "src/dsp/dwop_encode.c",
+    "src/dsp/rex_writer.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "per_file_flags": {
+    "src/dsp/plugin.c": [
+      "-ffast-math"
+    ]
+  },
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "upstream_build": "scripts/build.sh: gcc -O3 -DNDEBUG -c dwop.c rex_parser.c dwop_encode.c rex_writer.c; gcc -Ofast -shared plugin.c + objs -Isrc/dsp; dist/waveform-editor/{module.json,ui.js,dsp.so,help.json}. (Repo also commits prebuilt aarch64 src/dsp.so \u2014 ignored.)"
+}

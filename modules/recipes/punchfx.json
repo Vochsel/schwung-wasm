@@ -1,0 +1,44 @@
+{
+  "id": "punchfx",
+  "repo": "filliformes/punchfx-move",
+  "commit": "7b9604a1bb7817abad32272d801c443c25b569cc",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/punchfx.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=gnu11",
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/ui_chain.js",
+      "optional": true
+    }
+  ],
+  "so_name": "punchfx.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -ffast-math -std=gnu11 -DNDEBUG src/dsp/punchfx.c -Isrc/dsp; dist/punchfx/{module.json,help.json,ui_chain.js,punchfx.so}",
+  "wasm_notes": "shm_open(shadow-control) fails in the browser; module falls back to shadow_ctrl=NULL (Shift / selected-slot features degrade). No patch needed. Performance FX triggered by the left-half pads (notes 68-71,76-79,84-87,92-95); pass-through without them (test.notes not yet implemented by testhost).",
+  "test": {
+    "notes": [
+      68,
+      69,
+      70,
+      71
+    ]
+  }
+}

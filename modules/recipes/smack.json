@@ -1,0 +1,16 @@
+{
+  "id": "smack",
+  "repo": "timncox/schwung-smack",
+  "commit": "c018ecad7a2a3edb5042ba7992f0358ccad0eaaf",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/smack_core.c", "src/smack_fx.c"],
+  "include": ["include"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["modules/audio_fx/smack/module.json", "src/ui_chain.js", {"from": "src/help.json", "to": "help.json"}],
+  "so_name": "smack.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude src/smack_core.c src/smack_fx.c -o smack.so; build/modules/audio_fx/smack/{module.json,ui_chain.js,help.json,smack.so}"
+}

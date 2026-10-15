@@ -1,0 +1,40 @@
+{
+  "id": "surge",
+  "name": "Surge XT",
+  "repo": "charlesvestal/schwung-surge",
+  "commit": "cb1cddd6cc0281e456b15f569b4e4eb4c35ec3f0",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "submodules": true,
+  "pre_build": [
+    "mkdir -p wasm-compat && printf '%s\\n' '#pragma once' 'static inline int backtrace(void **b, int n) { (void)b; (void)n; return 0; }' 'static inline char **backtrace_symbols(void *const *b, int n) { (void)b; (void)n; return 0; }' 'static inline void backtrace_symbols_fd(void *const *b, int n, int fd) { (void)b; (void)n; (void)fd; }' > wasm-compat/execinfo.h",
+    "[ -f build-wasm/surge-libs.rsp ] || rm -rf build-wasm; [ -f build-wasm/surge-libs.rsp ] || ( emcmake cmake -S . -B build-wasm -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=\"-pthread -fPIC -isystem $PWD/wasm-compat\" -DCMAKE_CXX_FLAGS=\"-pthread -fPIC -DFMT_CONSTEVAL= -isystem $PWD/wasm-compat\" > build-wasm.log 2>&1 && cmake --build build-wasm --target surge-common -j8 >> build-wasm.log 2>&1 && find build-wasm -name '*.a' | sort > build-wasm/surge-libs.list && (echo -Wl,--start-group; cat build-wasm/surge-libs.list; echo -Wl,--end-group) > build-wasm/surge-libs.rsp ) || (tail -60 build-wasm.log; exit 1)",
+    "[ -f build-wasm/CMakeFiles/surge-move-plugin.dir/src/dsp/surge_plugin.cpp.o ] || make -C build-wasm src/dsp/surge_plugin.cpp.o > build-wasm-plugin.log 2>&1 || (tail -40 build-wasm-plugin.log; exit 1)"
+  ],
+  "sources": [],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++20"
+  ],
+  "ldflags": [
+    "build-wasm/CMakeFiles/surge-move-plugin.dir/src/dsp/surge_plugin.cpp.o",
+    "@build-wasm/surge-libs.rsp"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    "LICENSE",
+    "NOTICE",
+    "src/ui.js"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: cmake (CMakeLists.txt: Surge XT submodule, SURGE_SKIP_JUCE_FOR_RACK, SURGE_SKIP_LUA, block size 32) target surge-move-plugin -> dsp.so; dist/surge/{module.json,help.json,LICENSE,NOTICE,ui.js,dsp.so,surge-data/{patches_factory (minus Tutorials, Templates), patches_3rdparty/LinnStrument MPE, wavetables, configuration.xml}} (wasm: everything incl. surge_plugin.cpp is compiled by the upstream CMake via emcmake in pre_build; the recipe only links the side module)",
+  "wasm_notes": "fmt 9 (Surge submodule) + clang 20 C++20 consteval format strings fail to compile; built with -DFMT_CONSTEVAL= (disables compile-time format checks only). No <execinfo.h> in Emscripten: pre_build writes a no-op backtrace() stub header (sst-plugininfra misc_linux.cpp crash-handler only)."
+}

@@ -41,6 +41,7 @@ HELPER="$OBJROOT/.recipe-helper.mjs"
 cat > "$HELPER" <<'EOF'
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 const [,, cmd, recipePath, srcDir, objDir, stageDir] = process.argv;
 const r = cmd === 'manifest' ? null : JSON.parse(fs.readFileSync(recipePath, 'utf8'));
 const q = s => `'${String(s).replace(/'/g, `'\\''`)}'`;
@@ -80,6 +81,23 @@ function wasmImports(buf) {
     .map(([m, f]) => m === 'env' ? f : `${m}.${f}`);
 }
 
+if (cmd === 'extras') {
+  // one line per pinned dependency: repo<TAB>commit<TAB>dir<TAB>submodules
+  for (const e of r.extra_repos || []) console.log([e.repo, e.commit, e.dir, e.submodules ? 1 : 0].join('\t'));
+  process.exit(0);
+}
+if (cmd === 'downloads') {
+  // url<TAB>sha256<TAB>src-dest (only for "src" downloads, staged before compile)
+  for (const d of r.downloads || []) console.log([d.url, d.sha256, d.src ? d.to : ''].join('\t'));
+  process.exit(0);
+}
+if (cmd === 'prescript') {
+  // pre_build: shell commands run in the container from the source root
+  // before sources are globbed (configure, codegen, building a dep into a .a).
+  if (!(r.pre_build || []).length) process.exit(0);
+  console.log(['set -e', `cd ${q(toW(srcDir))}`, ...r.pre_build.map(c => `( ${c} )`)].join('\n'));
+  process.exit(0);
+}
 if (cmd === 'vars') {
   const [owner, repo] = r.repo.split('/');
   const out = {
@@ -106,6 +124,7 @@ if (cmd === 'vars') {
     ...(r.include_abs || []).map(i => '-I' + i),
     ...(r.defines || []).map(d => '-D' + d)];
   const lines = ['set -e', `cd ${q(toW(srcDir))}`, `OBJ=${q(toW(objDir))}`, 'rm -rf "$OBJ/o"; mkdir -p "$OBJ/o"', ': > "$OBJ/cmds"'];
+
   const objs = [];
   srcs.forEach((s, i) => {
     const isCxx = /\.(cc|cpp|cxx|C)$/.test(s);
@@ -140,11 +159,30 @@ if (cmd === 'vars') {
     for (const h of hits) {
       const src = path.join(srcDir, h);
       let dst;
+      // "to" starting with /data/ = absolute VFS path (e.g. UserLibrary/Samples)
+      const base = spec.to && spec.to.startsWith('/data/') ? path.join(process.env.ROOT, 'build/vfs') : stageDir;
       if (!spec.to) dst = path.join(stageDir, path.basename(h));
-      else if (spec.to.endsWith('/') || hits.length > 1) dst = path.join(stageDir, spec.to, path.basename(h));
-      else dst = path.join(stageDir, spec.to);
+      else if (spec.to.endsWith('/') || hits.length > 1) dst = path.join(base, spec.to, path.basename(h));
+      else dst = path.join(base, spec.to);
       fs.mkdirSync(path.dirname(dst), { recursive: true });
       fs.cpSync(src, dst, { recursive: true });
+    }
+  }
+  // pinned downloads that belong in the module dir or elsewhere in /data
+  for (const d of r.downloads || []) {
+    if (d.src) continue;
+    const cached = path.join(process.env.ROOT, 'build/module-downloads', d.sha256);
+    const dest = d.to.startsWith('/data/') ? path.join(process.env.ROOT, 'build/vfs', d.to) : path.join(stageDir, d.to);
+    if (d.extract) {
+      fs.rmSync(dest, { recursive: true, force: true });
+      fs.mkdirSync(dest, { recursive: true });
+      const isZip = /\.zip($|\?)/i.test(d.url) || d.extract === 'zip';
+      const args = isZip ? ['unzip', ['-q', '-o', cached, '-d', dest]] : ['tar', ['-xf', cached, '-C', dest, ...(d.strip ? [`--strip-components=${d.strip}`] : [])]];
+      const x = spawnSync(args[0], args[1], { stdio: 'inherit' });
+      if (x.status !== 0) { console.error(`recipe ${r.id}: extract failed: ${d.url}`); process.exit(5); }
+    } else {
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(cached, dest);
     }
   }
   // manifest entry
@@ -229,11 +267,41 @@ build_one() {
   echo "== $id ($R_REPO@${R_COMMIT:0:10})"
   fetch_src "$src" "https://github.com/$R_REPO.git" "$R_COMMIT" "$R_SUBMODULES" "$R_OWNER" "$R_NAME" ||
     { echo "!! $id: fetch failed"; return 1; }
+  # pinned dependency repos, cloned inside the module tree (git clean -fdx
+  # leaves nested repos alone, so they stay cached)
+  while IFS=$'\t' read -r erepo ecommit edir esubs; do
+    [ -n "$erepo" ] || continue
+    fetch_src "$src/$edir" "https://github.com/$erepo.git" "$ecommit" "$esubs" "${erepo%%/*}" "${erepo##*/}" ||
+      { echo "!! $id: fetch of $erepo failed"; return 1; }
+  done < <(node "$HELPER" extras "$recipe")
+  # pinned downloads (sha256-verified, cached in build/module-downloads/)
+  while IFS=$'\t' read -r durl dsha dsrc; do
+    [ -n "$durl" ] || continue
+    local cache="$ROOT/build/module-downloads/$dsha"
+    if [ ! -f "$cache" ]; then
+      mkdir -p "$ROOT/build/module-downloads"
+      curl -fsSL --retry 3 -o "$cache.part" "$durl" || { echo "!! $id: download failed: $durl"; return 1; }
+      local got; got=$(shasum -a 256 "$cache.part" | cut -d' ' -f1)
+      [ "$got" = "$dsha" ] || { echo "!! $id: sha256 mismatch for $durl (got $got)"; rm -f "$cache.part"; return 1; }
+      mv "$cache.part" "$cache"
+    fi
+    if [ -n "$dsrc" ]; then
+      case "$durl" in
+        *.zip) mkdir -p "$src/$dsrc" && unzip -q -o "$cache" -d "$src/$dsrc" ;;
+        *.tar*|*.tgz) mkdir -p "$src/$dsrc" && tar -xf "$cache" -C "$src/$dsrc" ;;
+        *) mkdir -p "$(dirname "$src/$dsrc")" && cp "$cache" "$src/$dsrc" ;;
+      esac
+    fi
+  done < <(node "$HELPER" downloads "$recipe")
   generic_fixups "$src"
   for p in "$ROOT/modules/patches/$id"/*.patch; do
     [ -e "$p" ] || continue
     patch -s -p1 -d "$src" < "$p" || { echo "!! $id: patch $(basename "$p") failed"; return 1; }
   done
+  node "$HELPER" prescript "$recipe" "$src" > "$obj/pre.sh" || { echo "!! $id: bad recipe"; return 1; }
+  if [ -s "$obj/pre.sh" ] && ! "$ROOT/scripts/em" bash "/w/${obj#$ROOT/}/pre.sh" > "$obj/pre.log" 2>&1; then
+    echo "!! $id: pre_build failed (build/module-obj/$id/pre.log):"; tail -15 "$obj/pre.log"; return 1
+  fi
   node "$HELPER" script "$recipe" "$src" "$obj" > "$obj/build.sh" || { echo "!! $id: bad recipe"; return 1; }
   if ! "$ROOT/scripts/em" bash "/w/${obj#$ROOT/}/build.sh" > "$obj/build.log" 2>&1; then
     echo "!! $id: compile failed (build/module-obj/$id/build.log):"

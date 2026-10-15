@@ -1,0 +1,16 @@
+{
+  "id": "belt",
+  "repo": "timncox/schwung-belt",
+  "commit": "febf1a4f1ce17a39be11927b48f4e79dd4143129",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/belt_core.c", "src/belt_fx.c"],
+  "include": ["include"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["modules/audio_fx/belt/module.json", "src/ui_chain.js", {"from": "src/help.json", "to": "help.json"}],
+  "so_name": "belt.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude src/belt_core.c src/belt_fx.c -o belt.so; build/modules/audio_fx/belt/{module.json,ui_chain.js,help.json,belt.so}"
+}

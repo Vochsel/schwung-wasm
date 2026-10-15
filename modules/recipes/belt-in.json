@@ -1,0 +1,17 @@
+{
+  "id": "belt-in",
+  "repo": "timncox/schwung-belt",
+  "commit": "febf1a4f1ce17a39be11927b48f4e79dd4143129",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/belt_core.c", "src/belt_gen.c"],
+  "include": ["include"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["modules/sound_generators/belt-in/module.json", "src/ui_chain.js", {"from": "src/help_belt_in.json", "to": "help.json"}],
+  "so_name": "dsp.so",
+  "test": {"audio_in": true},
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude src/belt_core.c src/belt_gen.c -o dsp.so; build/modules/sound_generators/belt-in/{module.json,ui_chain.js,help.json(=help_belt_in.json),dsp.so}. Reads live input from mapped_memory audio-in."
+}

@@ -1,0 +1,31 @@
+{
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "maze_seq",
+  "repo": "sd88me/schwung-maze",
+  "commit": "e774a674eef281248282ab47f69a9456bf6631fc",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/maze_seq/dsp/maze_seq.c"
+  ],
+  "include": [
+    "src/include"
+  ],
+  "assets": [
+    "src/maze_seq/module.json",
+    "src/maze_seq/ui.js",
+    "src/maze_seq/help.json",
+    {
+      "from": "src/maze_seq/web_ui.html",
+      "optional": true
+    }
+  ],
+  "test": {
+    "transport": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -shared -fPIC -O2 -Isrc/include src/maze_seq/dsp/maze_seq.c -lm -lpthread; dist/maze_seq/{dsp.so,module.json,ui.js,help.json,web_ui.html}"
+}

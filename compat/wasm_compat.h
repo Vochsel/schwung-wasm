@@ -10,6 +10,11 @@
 #endif
 /* glibc: give freed heap back to the OS. Emscripten's heap never shrinks. */
 static inline int malloc_trim(size_t pad) { (void)pad; return 0; }
+/* dlopen waits until the audio (device) thread has synced the new side
+ * module; see engine/dlsync.c. */
+#include <dlfcn.h>
+void *schwung_wasm_dlopen(const char *path, int flags);
+#define dlopen schwung_wasm_dlopen
 /* glibc: CPU affinity. A browser schedules workers itself. */
 #include <pthread.h>
 #include <sched.h>

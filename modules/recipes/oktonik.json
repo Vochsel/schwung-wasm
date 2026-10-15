@@ -1,0 +1,92 @@
+{
+  "defines": [],
+  "cflags": [
+    "-std=c11",
+    "-fvisibility=hidden"
+  ],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "oktonik",
+  "repo": "skerryvibe/oktonik",
+  "commit": "cfb466046ec88c128f689a8c0ff8e80b06c5f0a4",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "sources": [
+    "src/dsp/chord_pilot.c"
+  ],
+  "include": [
+    "src/vendor"
+  ],
+  "pre_build": [
+    "mkdir -p dist .wasm-stage && : > dist/dsp.so && : > dist/install-swap && node scripts/package-profiles.mjs --public && tar -xzf dist/oktonik-module.tar.gz -C .wasm-stage"
+  ],
+  "assets": [
+    {
+      "from": ".wasm-stage/oktonik/ui.js",
+      "to": "ui.js"
+    },
+    {
+      "from": ".wasm-stage/oktonik/display.mjs",
+      "to": "display.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/pilot.mjs",
+      "to": "pilot.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/recording.mjs",
+      "to": "recording.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/timeline.mjs",
+      "to": "timeline.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/bass-gesture.mjs",
+      "to": "bass-gesture.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/project.mjs",
+      "to": "project.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/settings.mjs",
+      "to": "settings.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/theory.mjs",
+      "to": "theory.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/ideas.mjs",
+      "to": "ideas.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/profile.mjs",
+      "to": "profile.mjs"
+    },
+    {
+      "from": ".wasm-stage/oktonik/module.json",
+      "to": "module.json"
+    },
+    {
+      "from": ".wasm-stage/oktonik/README.md",
+      "to": "README.md"
+    },
+    {
+      "from": ".wasm-stage/oktonik/help.json",
+      "to": "help.json"
+    },
+    {
+      "from": ".wasm-stage/oktonik/LICENSE",
+      "to": "LICENSE"
+    },
+    {
+      "from": ".wasm-stage/oktonik/NOTICE.md",
+      "to": "NOTICE.md"
+    }
+  ],
+  "wasm_notes": "Public profile packaged by upstream scripts/package-profiles.mjs (placeholder binaries, then extracted). install-swap (native helper the UI os.exec()s) is omitted. -fvisibility=hidden is safe: the init symbol is marked default-visible? see test.",
+  "upstream_build": "scripts/build-dsp.sh: cc -std=c11 -O2 -Werror -I src/vendor -fPIC -fvisibility=hidden -shared src/dsp/chord_pilot.c; scripts/package-profiles.mjs --public -> oktonik/{ui.js,*.mjs,profile.mjs,module.json,README.md,help.json,LICENSE,NOTICE.md,dsp.so,install-swap}"
+}

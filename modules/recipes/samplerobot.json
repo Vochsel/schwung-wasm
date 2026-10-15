@@ -1,0 +1,42 @@
+{
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "so_name": "dsp.so",
+  "id": "samplerobot",
+  "repo": "charlesvestal/schwung-autosample",
+  "commit": "7f8fbd81797146086b810fe2c3535d09b1ec6a0b",
+  "license": "MIT",
+  "component_type": "tool",
+  "category_dir": "tools",
+  "submodules": true,
+  "sources": [
+    "src/dsp/samplerobot_plugin.c",
+    "src/dsp/wav_writer.c",
+    "src/dsp/silence_detect.c",
+    "src/dsp/sfz_writer.c",
+    "src/dsp/loop_finder.c",
+    "src/dsp/third_party/kissfft/kiss_fft.c",
+    "src/dsp/third_party/kissfft/kiss_fftr.c"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/third_party/kissfft"
+  ],
+  "assets": [
+    "src/module.json",
+    "src/ui.js",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "test": {
+    "audio_in": true
+  },
+  "upstream_build": "scripts/build.sh: gcc -Ofast -shared -fPIC -DNDEBUG samplerobot_plugin.c wav_writer.c silence_detect.c sfz_writer.c loop_finder.c kissfft/kiss_fft(r).c; dist/samplerobot/{module.json,ui.js,dsp.so,help.json}"
+}

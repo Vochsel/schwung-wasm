@@ -1,0 +1,18 @@
+{
+  "id": "smack-in",
+  "repo": "timncox/schwung-smack",
+  "commit": "c018ecad7a2a3edb5042ba7992f0358ccad0eaaf",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/smack_core.c", "src/smack_gen.c"],
+  "include": ["include"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["modules/sound_generators/smack-in/module.json", "src/ui_chain.js",
+             {"from": "src/help_smack_in.json", "to": "help.json"}, "src/web_ui.html"],
+  "so_name": "dsp.so",
+  "test": {"audio_in": true},
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude src/smack_core.c src/smack_gen.c -o dsp.so; build/modules/sound_generators/smack-in/{module.json,ui_chain.js,help.json(=help_smack_in.json),web_ui.html,dsp.so}. Reads live input from mapped_memory audio-in."
+}

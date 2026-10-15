@@ -1,0 +1,17 @@
+{
+  "id": "beatbank",
+  "repo": "mission-minnow/beatbank",
+  "commit": "7d1b57f857260569b1b2ad91a573be60926e6efa",
+  "license": "MIT",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": ["src/dsp/patterns.c", "src/host/beatbank_plugin.c"],
+  "include": ["src/dsp", "src/host"],
+  "defines": [],
+  "cflags": ["-std=c99"],
+  "cxx": false,
+  "assets": ["src/module.json", "src/canvas.js", {"from": "src/help.json", "optional": true},
+             {"from": "src/patterns/*.beat", "to": "patterns/"}],
+  "so_name": "dsp.so",
+  "upstream_build": "Makefile aarch64: gcc -std=c99 -O2 -fPIC -Isrc/dsp -Isrc/host -shared patterns.c beatbank_plugin.c; scripts/package.sh: dist/beatbank/{module.json,canvas.js,help.json,patterns/*.beat,dsp.so}"
+}

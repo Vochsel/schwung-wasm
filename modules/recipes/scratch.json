@@ -1,0 +1,42 @@
+{
+  "id": "scratch",
+  "repo": "mestela/schwung-scratch",
+  "commit": "9be303b6e6d2d92ef31ba3a9c7ae2c4c42948b95",
+  "license": "GPL-3.0-or-later",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/scratch.c",
+    "src/dsp/scratch_engine.c",
+    "src/dsp/vendor/xwax/timecoder.c",
+    "src/dsp/vendor/xwax/lut.c"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/vendor/xwax"
+  ],
+  "defines": [],
+  "cflags": [
+    "-std=gnu11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/monitor.js",
+    "src/scratch_view.js",
+    "src/help.json",
+    {
+      "from": "samples/ahh-fresh.wav",
+      "to": "samples/"
+    },
+    "COPYING",
+    "THIRD_PARTY_LICENSES.md",
+    "SAMPLE_LICENSE.md"
+  ],
+  "so_name": "dsp.so",
+  "demo_content": "samples/ahh-fresh.wav ships in the repo (GPL-3.0-or-later, see SAMPLE_LICENSE.md)",
+  "upstream_build": "scripts/build.sh: gcc -std=gnu11 -O3 -shared -fPIC -Isrc/dsp -Isrc/dsp/vendor/xwax scratch.c scratch_engine.c xwax/timecoder.c xwax/lut.c -lpthread; dist/scratch/{dsp.so,module.json,monitor.js,scratch_view.js,help.json,samples/ahh-fresh.wav,COPYING,THIRD_PARTY_LICENSES.md,SAMPLE_LICENSE.md}",
+  "test": {
+    "wait_ms": 3000
+  }
+}
