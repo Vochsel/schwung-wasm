@@ -1,0 +1,43 @@
+{
+  "id": "6w6",
+  "repo": "athousanddetails/schwung-6W6",
+  "commit": "2bda07e4261a118f402c03950bd2a8ca78f89b61",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/sd606_plugin.cpp",
+    "src/dsp/sd606_engine.cpp"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/host",
+    "src/vendor/606"
+  ],
+  "defines": [],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/ui_chain.js",
+      "optional": true
+    },
+    {
+      "from": "src/web_ui.html",
+      "optional": true
+    },
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt target sd606 (C++14 -O3; sd606_plugin.cpp + sd606_engine.cpp; -Isrc -Isrc/dsp -Isrc/host -Isrc/vendor/606); gen_params.py output committed; dist/6w6/{dsp.so,module.json,ui_chain.js,web_ui.html,help.json}"
+}

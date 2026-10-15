@@ -1,0 +1,31 @@
+{
+  "id": "tapescam",
+  "repo": "charlesvestal/schwung-tapescam",
+  "commit": "e9ab1ae20aa780da23a9a284d7e95402f51d17e4",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/tapescam.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "tapescam.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/tapescam.c -Isrc/dsp; dist/tapescam/{module.json,help.json,tapescam.so}"
+}

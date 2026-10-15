@@ -1,0 +1,31 @@
+{
+  "id": "chonk",
+  "repo": "legsmechanical/schwung-chonk",
+  "commit": "da41ad0a3662094b06418711e00972ff1b41800e",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/chonk_plugin.cpp"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14",
+    "-Wno-comment"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    "src/ui.js"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 -shared src/dsp/chonk_plugin.cpp -Isrc/dsp (node tools/gen_*.mjs outputs are committed); dist/chonk/{module.json,help.json,ui.js,dsp.so}"
+}

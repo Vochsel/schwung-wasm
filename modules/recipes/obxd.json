@@ -1,0 +1,38 @@
+{
+  "id": "obxd",
+  "repo": "charlesvestal/schwung-obxd",
+  "commit": "f02973f4075a86ab811b7193cc1ba9bdd58273f4",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/obxd_plugin.cpp"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/web_ui.html",
+      "optional": true
+    },
+    "src/ui.js",
+    {
+      "from": "src/presets/*.fxb",
+      "to": "presets/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 -fno-gnu-unique src/dsp/obxd_plugin.cpp -Isrc/dsp; dist/obxd/{module.json,help.json,web_ui.html,ui.js,dsp.so,presets/*.fxb}"
+}

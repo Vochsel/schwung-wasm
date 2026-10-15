@@ -1,0 +1,31 @@
+{
+  "id": "usefulity",
+  "repo": "charlesvestal/schwung-usefulity",
+  "commit": "5bb2f00d76bf0f36e2d02c875b39d078c04b4b65",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/usefulity.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "usefulity.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/usefulity.c -Isrc/dsp; dist/usefulity/{module.json,help.json,usefulity.so}"
+}

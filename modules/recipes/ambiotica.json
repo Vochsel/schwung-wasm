@@ -1,0 +1,40 @@
+{
+  "id": "ambiotica",
+  "repo": "charlesvestal/schwung-ambiotica",
+  "commit": "ac710ba4daea3584d001400a2aa3094af8d77438",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/plugin.c",
+    "src/dsp/looper.c",
+    "src/dsp/granular.c",
+    "src/dsp/microloop.c",
+    "src/dsp/reverb.c",
+    "src/dsp/lfo.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "LICENSE",
+      "optional": true
+    }
+  ],
+  "so_name": "ambiotica.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -ffast-math -DNDEBUG -Isrc/dsp plugin.c looper.c granular.c microloop.c reverb.c lfo.c; dist/ambiotica/{module.json,help.json,ambiotica.so,LICENSE}"
+}

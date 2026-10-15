@@ -1,0 +1,31 @@
+{
+  "id": "gate",
+  "repo": "charlesvestal/schwung-gate",
+  "commit": "49bc5a5a2cd01f1b4965993860e29f7b78fc22a5",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/gate.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "gate.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/gate.c -Isrc/dsp; dist/gate/{module.json,help.json,gate.so}"
+}

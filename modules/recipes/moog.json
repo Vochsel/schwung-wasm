@@ -1,0 +1,38 @@
+{
+  "id": "moog",
+  "repo": "charlesvestal/schwung-moog",
+  "commit": "4f1f658c35a13a5786f13d31a77aba67312ca0dd",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/moog_plugin.cpp",
+    "src/dsp/moog_engine.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    "src/ui.js"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 moog_plugin.cpp moog_engine.c (engine compiled AS C++) -Isrc/dsp; dist/moog/{module.json,help.json,ui.js,dsp.so}",
+  "per_file_flags": {
+    "src/dsp/moog_engine.c": [
+      "-x",
+      "c++",
+      "-std=c++14"
+    ]
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "wurl",
+  "repo": "filliformes/wurl-move",
+  "commit": "2d5b77dd7431d2545adf8f4af1fb5260c30120bf",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/wurl.c"],
+  "include": [],
+  "defines": [],
+  "cflags": ["-ffast-math"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true},
+             {"from": "chain_patches/*", "to": "chain_patches/"}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -ffast-math src/dsp/wurl.c -lm; dist/wurl/{dsp.so,module.json,help.json,chain_patches/*}"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "8w8",
+  "repo": "athousanddetails/schwung-8W8",
+  "commit": "6fa3f70d52c76f17d816581c668e3ab65b2cd395",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/w8_plugin.cpp", "src/dsp/w8_engine.cpp"],
+  "include": ["src", "src/dsp", "src/host"],
+  "defines": [],
+  "cflags": ["-std=c11"],
+  "cxxflags": ["-std=c++14"],
+  "cxx": true,
+  "assets": ["src/module.json", {"from": "src/ui_chain.js", "optional": true},
+             {"from": "src/web_ui.html", "optional": true}, {"from": "src/help.json", "optional": true}],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt target w8 (C++14 -O3, src/dsp/w8_plugin.cpp + w8_engine.cpp, -Isrc -Isrc/dsp -Isrc/host); scripts/gen_params.py output (src/dsp/w8_params.h) is committed and in sync; dist/8w8/{dsp.so,module.json,ui_chain.js,web_ui.html?,help.json}"
+}

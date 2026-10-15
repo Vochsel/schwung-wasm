@@ -1,0 +1,18 @@
+{
+  "id": "eucalypso",
+  "repo": "handcraftedcc/move-everything-eucalypso",
+  "commit": "f0ff52557829bd686118f45b90119c59188a9bf8",
+  "license": "MIT",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": ["src/dsp/eucalypso.c"],
+  "include": ["src", "src/dsp"],
+  "include_abs": ["/w/build/schwung/src"],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true},
+             {"from": "src/chain_patches/*.json", "to": "chain_patches/", "optional": true}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build-module.sh: gcc -O3 -fPIC -shared -Isrc -Isrc/dsp -I$MOVE_ANYTHING_SRC src/dsp/eucalypso.c (MOVE_ANYTHING_SRC = Schwung src/, here build/schwung/src); dist/eucalypso/{module.json,help.json,dsp.so,chain_patches/*.json}"
+}

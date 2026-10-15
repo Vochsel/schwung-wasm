@@ -1,0 +1,16 @@
+{
+  "id": "junologue-chorus",
+  "repo": "charlesvestal/schwung-junologue-chorus",
+  "commit": "0b1ecd9d09daad91b5726899bd5e4cfe3f97cf06",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/junologue_chorus.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": ["-ffast-math"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}],
+  "so_name": "junologue-chorus.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -shared -fPIC -DNDEBUG src/dsp/junologue_chorus.c -Isrc/dsp -lm (-Ofast => -ffast-math here); dist/junologue-chorus/{module.json,help.json,junologue-chorus.so}"
+}

@@ -1,0 +1,31 @@
+{
+  "id": "chordism",
+  "repo": "charlesvestal/schwung-chordism",
+  "commit": "2a656141a1d7d524abef47ec4f27ce96aa6264a3",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/chordism_plugin.cpp"
+  ],
+  "include": [],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "LICENSE",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 src/dsp/chordism_plugin.cpp; dist/chordism/{module.json,help.json,LICENSE,dsp.so}"
+}

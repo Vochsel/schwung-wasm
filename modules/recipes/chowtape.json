@@ -1,0 +1,31 @@
+{
+  "id": "chowtape",
+  "repo": "charlesvestal/schwung-chowtape",
+  "commit": "8a2a6d08cf4cb772e9a7f98ec71161bf0a7b7e86",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/chowtape.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "chowtape.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/chowtape.c -Isrc/dsp; dist/chowtape/{module.json,help.json,chowtape.so}"
+}

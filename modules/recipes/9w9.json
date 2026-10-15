@@ -1,0 +1,34 @@
+{
+  "id": "9w9",
+  "repo": "athousanddetails/schwung-9W9",
+  "commit": "8e9aebde0c40a4c017f640e5c30a4f70936bb595",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/9w9_plugin.c",
+    "src/dsp/9w9_engine.c"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/host"
+  ],
+  "defines": [],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/ui_chain.js",
+    "src/web_ui.html",
+    "src/help.json",
+    {
+      "from": "src/samples/*.wav",
+      "to": "samples/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt target 9w9 (C11 -O3; 9w9_plugin.c + 9w9_engine.c; -Isrc -Isrc/dsp -Isrc/host); dist/9w9/{dsp.so,module.json,ui_chain.js,web_ui.html,help.json,samples/*.wav}"
+}

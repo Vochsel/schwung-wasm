@@ -1,0 +1,23 @@
+{
+  "id": "fizzik",
+  "repo": "filliformes/fizzik-move",
+  "commit": "1af291e2fb83477b64dca807430d860a81ce6cc6",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/fizzik.c"
+  ],
+  "include": [],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/help.json"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "release.yml: gcc -O2 -ffast-math -shared -fPIC src/dsp/fizzik.c; dist/fizzik/{module.json,help.json,dsp.so}"
+}

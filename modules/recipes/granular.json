@@ -1,0 +1,31 @@
+{
+  "id": "granular",
+  "repo": "filliformes/boris-move",
+  "commit": "2f8f61cd39512c381e4ccb3804d0b833582422d6",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/granular.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11",
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "granular.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -std=c11 -shared -fPIC -DNDEBUG src/dsp/granular.c -Isrc/dsp; dist/granular/{module.json,help.json,granular.so}"
+}

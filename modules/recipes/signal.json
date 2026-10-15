@@ -1,0 +1,26 @@
+{
+  "id": "signal",
+  "repo": "filliformes/signal-move",
+  "commit": "77b6a8821351a8e4757761c32373cbac1fc459c5",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/signal.c"
+  ],
+  "include": [],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -ffast-math src/dsp/signal.c; dist/signal/{dsp.so,module.json,help.json}"
+}

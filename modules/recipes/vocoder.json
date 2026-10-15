@@ -1,0 +1,31 @@
+{
+  "id": "vocoder",
+  "repo": "charlesvestal/schwung-vocoder",
+  "commit": "261ce6a0c929c65fd52e4b81545f064d0f6b0cf4",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/vocoder.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "vocoder.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/vocoder.c -Isrc/dsp; dist/vocoder/{module.json,help.json,vocoder.so}"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "krautdrums",
+  "repo": "filliformes/krautdrums-move",
+  "commit": "c359afeac8be6396401b1a6d5d9a297f7ed0220a",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/krautdrums.c"
+  ],
+  "include": [],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O2 -shared -fPIC -ffast-math src/dsp/krautdrums.c; dist/krautdrums/{dsp.so,module.json}"
+}

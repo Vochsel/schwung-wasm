@@ -1,0 +1,38 @@
+{
+  "id": "war_bells",
+  "repo": "seajaysec/war-bells",
+  "commit": "bd13e8938fc359c216dce7efe6711b39c8a9fd36",
+  "license": "AGPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/war_bells.c",
+    "src/dsp/effects.c",
+    "src/dsp/params.c"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/dsp/core"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "ui_chain.js",
+    {
+      "from": "help.json",
+      "optional": true
+    },
+    {
+      "from": "docs/index.html",
+      "to": "web_ui.html",
+      "optional": true
+    }
+  ],
+  "so_name": "war_bells.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -fPIC -shared -ffast-math -Isrc -Isrc/dsp -Isrc/dsp/core src/dsp/{war_bells,effects,params}.c; dist/war_bells/{war_bells.so,module.json,ui_chain.js,help.json,web_ui.html (from docs/index.html)}. Upstream also has its own wasm/ standalone build (wbw.c), not used here."
+}

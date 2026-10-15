@@ -1,0 +1,47 @@
+{
+  "id": "noisemaker",
+  "repo": "legsmechanical/schwung-noisemaker",
+  "commit": "543fc7005e1983d476ac79a875aa1f30248ba514",
+  "license": "GPL-2.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/noisemaker_plugin.cpp",
+    "src/dsp/Engine/Lfo.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/Engine"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14",
+    "-fpermissive",
+    "-Wno-write-strings"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/web_ui.html",
+      "optional": true
+    },
+    "src/ui.js",
+    {
+      "from": "src/cards.js",
+      "optional": true
+    },
+    {
+      "from": "src/presets/*",
+      "to": "presets/",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 -fpermissive -Wno-write-strings -shared noisemaker_plugin.cpp Engine/Lfo.cpp -Isrc/dsp -Isrc/dsp/Engine; dist/noisemaker/{module.json,help.json?,web_ui.html?,ui.js,cards.js,dsp.so,presets/*?}"
+}

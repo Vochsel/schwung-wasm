@@ -1,0 +1,17 @@
+{
+  "id": "hush1",
+  "repo": "charlesvestal/schwung-hush1",
+  "commit": "598ab90505f7f924d09ed83f47e46430218cd43b",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/sh101_plugin.c", "src/dsp/sh101_control.c", "src/dsp/sh101_osc.c",
+              "src/dsp/sh101_env.c", "src/dsp/sh101_filter.c", "src/dsp/sh101_lfo.c"],
+  "include": ["src", "src/dsp"],
+  "defines": [],
+  "cflags": ["-std=c11"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}, "src/ui.js", {"mkdir": "presets"}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O3 -shared -fPIC src/dsp/sh101_*.c -Isrc -Isrc/dsp -lm; dist/hush1/{module.json,help.json,ui.js,dsp.so,presets/}"
+}

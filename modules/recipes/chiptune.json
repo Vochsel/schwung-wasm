@@ -1,0 +1,91 @@
+{
+  "id": "chiptune",
+  "repo": "charlesvestal/schwung-chiptune",
+  "commit": "f79280775252f5e0c144dd2b7462101afca3f9dc",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/chiptune_plugin.cpp",
+    "src/libs/nes_snd_emu/nes_apu/Nes_Apu.cpp",
+    "src/libs/nes_snd_emu/nes_apu/Nes_Oscs.cpp",
+    "src/libs/nes_snd_emu/nes_apu/Blip_Buffer.cpp",
+    "src/libs/gb_snd_emu/Gb_Apu.cpp",
+    "src/libs/gb_snd_emu/Gb_Oscs.cpp",
+    "src/libs/gb_snd_emu/Blip_Buffer.cpp",
+    "src/libs/gb_snd_emu/Multi_Buffer.cpp",
+    "src/libs/gb_snd_emu/gb_apu_wrapper.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/libs/nes_snd_emu",
+    "src/libs/gb_snd_emu"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/chain_patches/*.json",
+      "to": "chain_patches/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14; nes_apu/{Nes_Apu,Nes_Oscs,Blip_Buffer}.cpp -Isrc/libs/nes_snd_emu; gb_snd_emu/*.cpp -fvisibility=hidden then ld -r + objcopy --localize-hidden (two different Blip_Buffer); chiptune_plugin.cpp -Isrc/dsp -Isrc/libs/nes_snd_emu -Isrc/libs/gb_snd_emu; dist/chiptune/{module.json,help.json,dsp.so,chain_patches/*.json}",
+  "submodules": true,
+  "per_file_flags": {
+    "src/libs/gb_snd_emu/Gb_Apu.cpp": [
+      "-DBlip_Buffer=GbBlip_Buffer",
+      "-DBlip_Impulse_=GbBlip_Impulse_",
+      "-DBlip_Reader=GbBlip_Reader",
+      "-DBlip_Synth=GbBlip_Synth",
+      "-DBlip_Wave=GbBlip_Wave",
+      "-DBlip_wave=GbBlip_wave",
+      "-fvisibility=hidden"
+    ],
+    "src/libs/gb_snd_emu/Gb_Oscs.cpp": [
+      "-DBlip_Buffer=GbBlip_Buffer",
+      "-DBlip_Impulse_=GbBlip_Impulse_",
+      "-DBlip_Reader=GbBlip_Reader",
+      "-DBlip_Synth=GbBlip_Synth",
+      "-DBlip_Wave=GbBlip_Wave",
+      "-DBlip_wave=GbBlip_wave",
+      "-fvisibility=hidden"
+    ],
+    "src/libs/gb_snd_emu/Blip_Buffer.cpp": [
+      "-DBlip_Buffer=GbBlip_Buffer",
+      "-DBlip_Impulse_=GbBlip_Impulse_",
+      "-DBlip_Reader=GbBlip_Reader",
+      "-DBlip_Synth=GbBlip_Synth",
+      "-DBlip_Wave=GbBlip_Wave",
+      "-DBlip_wave=GbBlip_wave",
+      "-fvisibility=hidden"
+    ],
+    "src/libs/gb_snd_emu/Multi_Buffer.cpp": [
+      "-DBlip_Buffer=GbBlip_Buffer",
+      "-DBlip_Impulse_=GbBlip_Impulse_",
+      "-DBlip_Reader=GbBlip_Reader",
+      "-DBlip_Synth=GbBlip_Synth",
+      "-DBlip_Wave=GbBlip_Wave",
+      "-DBlip_wave=GbBlip_wave",
+      "-fvisibility=hidden"
+    ],
+    "src/libs/gb_snd_emu/gb_apu_wrapper.cpp": [
+      "-DBlip_Buffer=GbBlip_Buffer",
+      "-DBlip_Impulse_=GbBlip_Impulse_",
+      "-DBlip_Reader=GbBlip_Reader",
+      "-DBlip_Synth=GbBlip_Synth",
+      "-DBlip_Wave=GbBlip_Wave",
+      "-DBlip_wave=GbBlip_wave"
+    ]
+  },
+  "wasm_notes": "Upstream isolates gb_snd_emu's Blip_Buffer from Nes_Snd_Emu's via -fvisibility=hidden + ld -r + objcopy --localize-hidden; wasm-ld has no equivalent, so the gb_snd_emu classes are renamed with -D macros (Blip_* -> GbBlip_*) on those TUs only."
+}

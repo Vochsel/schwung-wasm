@@ -1,0 +1,39 @@
+{
+  "id": "busdriver",
+  "repo": "legsmechanical/schwung-busdriver",
+  "commit": "36b6788de7eb15e11a5072680b6fbf06c020a947",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/busdriver_module.cpp"
+  ],
+  "include": [
+    "src",
+    "shared",
+    "dsp",
+    "vendor"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17",
+    "-ffast-math"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/canvas.js",
+      "optional": true
+    }
+  ],
+  "so_name": "busdriver.so",
+  "upstream_build": "scripts/build.sh: g++ -Ofast -std=c++17 -DNDEBUG -shared src/busdriver_module.cpp -Isrc -Ishared -Idsp -Ivendor (-Ofast => -ffast-math here); dist/busdriver/{busdriver.so,module.json,help.json,canvas.js?}"
+}

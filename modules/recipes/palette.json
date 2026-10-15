@@ -1,0 +1,37 @@
+{
+  "id": "palette",
+  "repo": "filliformes/palette-move",
+  "commit": "7a5a1428055571360c2d85d385701a060ea5c88b",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/*.c",
+    "src/dsp/*.cc"
+  ],
+  "include": [
+    "src/dsp",
+    "vendor/clouds_engine",
+    "vendor/signalsmith"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [
+    "-ffast-math",
+    "-std=c++11",
+    "-fno-exceptions",
+    "-fno-rtti"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "palette.so",
+  "upstream_build": "release.yml/scripts/build.sh: gcc -O2 -ffast-math -Isrc/dsp src/dsp/*.c; g++ -O2 -ffast-math -std=c++11 -fno-exceptions -fno-rtti -Isrc/dsp -Ivendor/clouds_engine -Ivendor/signalsmith src/dsp/*.cc *.cpp; dist/palette/{palette.so,module.json,help.json}"
+}

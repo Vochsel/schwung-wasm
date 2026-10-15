@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Schwung Web</title>
+<style>
+  :root {
+    --bg: #0b0b0c; --fg: #d8d8da; --dim: #85858b; --faint: #4a4a50; --line: #232327;
+    --panel: #141416; --accent: #8fd3ff; --ok: #5fcf6a; --warn: #e0a640; --bad: #e0544b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg);
+    font: 13px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; }
+  body { display: flex; flex-direction: column; min-height: 100dvh; overflow: hidden;
+    background: radial-gradient(ellipse at 50% 40%, #1a1a1d 0%, var(--bg) 70%);
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  header, footer { display: flex; align-items: center; gap: 10px; padding: 10px 16px; flex-wrap: wrap; }
+  header { justify-content: space-between; }
+  .brand { display: flex; align-items: baseline; gap: 10px; }
+  .brand b { font-weight: 650; letter-spacing: 0.02em; font-size: 15px; }
+  .brand span { color: var(--dim); font-size: 12px; }
+  .badge { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .06em; text-transform: uppercase;
+    padding: 4px 7px; border-radius: 999px; border: 1px solid var(--warn); color: var(--warn); }
+  .badge.real { border-color: var(--ok); color: var(--ok); }
+  .tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  button.t, label.t { background: #18181b; color: var(--fg); border: 1px solid #2c2c31; border-radius: 6px;
+    font: inherit; font-size: 12px; padding: 5px 10px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+  button.t:hover, label.t:hover { border-color: #46464d; }
+  button.t.on { border-color: var(--accent); color: #fff; }
+  button.t:disabled { opacity: .45; cursor: default; }
+  label.t input { width: 46px; background: transparent; border: 0; color: var(--fg); font: inherit; text-align: right; outline: none; }
+  main { flex: 1; display: flex; align-items: center; justify-content: center; padding: 0 16px; min-height: 0; }
+  #stage { position: relative; }
+  #device { display: block; border-radius: 12px; box-shadow: 0 30px 80px rgba(0,0,0,.6), 0 2px 0 rgba(255,255,255,.03) inset; }
+  footer { font: 11px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--dim); justify-content: center; gap: 4px 16px; }
+  footer .k { color: var(--faint); }
+  footer .v { color: var(--fg); }
+  footer .v.warn { color: var(--warn); } footer .v.bad { color: var(--bad); }
+  #tip { position: fixed; pointer-events: none; z-index: 20; padding: 4px 8px; border-radius: 5px; background: #000d;
+    border: 1px solid #333; font-size: 12px; white-space: nowrap; opacity: 0; transition: opacity .08s; }
+  #tip.on { opacity: 1; }
+  #tip .key { color: var(--dim); margin-left: 6px; font-family: ui-monospace, Menlo, monospace; font-size: 11px; }
+  .overlay { position: fixed; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+    background: rgba(5,5,6,.55); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); }
+  .overlay.hidden { display: none; }
+  #power { display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; padding: 16px; }
+  #powerBtn { width: 96px; height: 96px; border-radius: 50%; border: 1px solid #3a3a40; cursor: pointer;
+    background: radial-gradient(circle at 40% 35%, #2c2c31, #151517); color: var(--fg); display: grid; place-items: center;
+    box-shadow: 0 0 0 6px rgba(143,211,255,.06), 0 10px 30px rgba(0,0,0,.6); transition: box-shadow .15s, transform .05s; }
+  #powerBtn:hover { box-shadow: 0 0 0 6px rgba(143,211,255,.16), 0 10px 30px rgba(0,0,0,.6); }
+  #powerBtn:active { transform: scale(.97); }
+  #powerBtn svg { width: 38px; height: 38px; stroke: var(--accent); }
+  #powerBtn:disabled { cursor: progress; }
+  #powerMsg { color: var(--dim); max-width: 34em; min-height: 1.4em; }
+  #powerMsg.err { color: var(--bad); white-space: pre-wrap; text-align: left; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+  #help .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px 22px;
+    max-width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; }
+  #help h2 { margin: 0 0 10px; font-size: 15px; }
+  #help h3 { margin: 14px 0 6px; font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: .08em; }
+  #help table { border-collapse: collapse; width: 100%; }
+  #help td { padding: 3px 0; vertical-align: top; }
+  #help td:first-child { width: 42%; padding-right: 14px; }
+  kbd { font: 11px ui-monospace, Menlo, monospace; background: #222226; border: 1px solid #333338; border-bottom-width: 2px;
+    border-radius: 4px; padding: 1px 5px; color: var(--fg); }
+  @media (max-width: 600px) {
+    header, footer { padding: 8px 10px; }
+    .brand span { display: none; }
+    main { padding: 0 8px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b>Schwung</b><span>virtual Ableton Move</span><em id="badge" class="badge" hidden>mock engine</em></div>
+  <div class="tools">
+    <label class="t" title="Tempo (sw_set_bpm)">BPM <input id="bpm" type="number" min="20" max="300" step="1" value="120"></label>
+    <button class="t" id="midiBtn" type="button" title="Forward Web MIDI input to the engine on cable 2">MIDI in</button>
+    <button class="t" id="helpBtn" type="button" title="Controls (?)">?</button>
+  </div>
+</header>
+<main><div id="stage"><canvas id="device" aria-label="Virtual Ableton Move"></canvas></div></main>
+<footer id="status">
+  <span><span class="k">engine</span> <span class="v" id="sEngine">off</span></span>
+  <span><span class="k">latency</span> <span class="v" id="sLat">–</span></span>
+  <span><span class="k">ring</span> <span class="v" id="sRing">–</span></span>
+  <span><span class="k">underruns</span> <span class="v" id="sUnder">–</span></span>
+  <span><span class="k">dsp</span> <span class="v" id="sCpu">–</span></span>
+  <span><span class="k">ui</span> <span class="v" id="sUi">–</span></span>
+</footer>
+<div id="tip"></div>
+
+<div class="overlay" id="powerOverlay">
+  <div id="power">
+    <button id="powerBtn" type="button" aria-label="Power on">
+      <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M12 3v8"/><path d="M6.3 6.8a8 8 0 1 0 11.4 0"/></svg>
+    </button>
+    <div><b>Power on</b></div>
+    <div id="powerMsg">Starts audio and boots the engine.</div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="help">
+  <div class="card" role="dialog" aria-label="Controls">
+    <h2>Controls</h2>
+    <h3>Mouse / touch</h3>
+    <table>
+      <tr><td>Pads</td><td>Press; velocity from pressure or from where you hit (top = hard). Multi-touch works. Pressure changes send poly aftertouch.</td></tr>
+      <tr><td>Knobs 1–8, master</td><td>Drag up/down (faster = bigger steps, <kbd>Shift</kbd> = fine), or scroll over them. Touching sends the touch note.</td></tr>
+      <tr><td>Jog wheel</td><td>Drag around the rim or scroll to turn; click the centre to push.</td></tr>
+      <tr><td>Buttons / steps</td><td>Press and hold like the hardware.</td></tr>
+    </table>
+    <h3>Keyboard</h3>
+    <table>
+      <tr><td><kbd>A</kbd> <kbd>W</kbd> <kbd>S</kbd> <kbd>E</kbd> <kbd>D</kbd> … <kbd>;</kbd> <kbd>'</kbd></td><td>Piano on the pads (bottom-left pad = <kbd>A</kbd>, chromatic up the rows)</td></tr>
+      <tr><td><kbd>Z</kbd> / <kbd>X</kbd></td><td>Piano range down / up one octave of pads</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd> <kbd>↑</kbd> <kbd>↓</kbd></td><td>Left / Right / Up / Down</td></tr>
+      <tr><td><kbd>[</kbd> <kbd>]</kbd> &nbsp; <kbd>Enter</kbd></td><td>Jog turn &nbsp;·&nbsp; jog click</td></tr>
+      <tr><td><kbd>Backspace</kbd> / <kbd>Esc</kbd></td><td>Back</td></tr>
+      <tr><td><kbd>Shift</kbd> &nbsp; <kbd>Space</kbd> &nbsp; <kbd>R</kbd></td><td>Shift &nbsp;·&nbsp; Play &nbsp;·&nbsp; Record</td></tr>
+      <tr><td><kbd>M</kbd> <kbd>C</kbd> <kbd>B</kbd> <kbd>N</kbd> <kbd>V</kbd> <kbd>I</kbd> <kbd>Del</kbd> <kbd>Ctrl/⌘ Z</kbd></td><td>Menu, Capture, Loop, Mute, Copy, Sample, Delete, Undo</td></tr>
+      <tr><td><kbd>F1</kbd>–<kbd>F4</kbd></td><td>Track buttons 1–4</td></tr>
+      <tr><td>Hold <kbd>1</kbd>–<kbd>8</kbd> (<kbd>9</kbd> = master)</td><td>Touches that knob; then scroll anywhere or press <kbd>-</kbd> / <kbd>=</kbd> to turn it</td></tr>
+      <tr><td><kbd>?</kbd></td><td>This help</td></tr>
+    </table>
+    <h3>External MIDI</h3>
+    <p style="margin:0;color:var(--dim)">“MIDI in” forwards notes, CCs, pitch bend and pressure from Web MIDI inputs to the engine on cable 2 (Move’s USB-A port).</p>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

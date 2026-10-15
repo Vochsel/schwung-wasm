@@ -1,0 +1,21 @@
+{
+  "id": "braids",
+  "repo": "charlesvestal/schwung-braids",
+  "commit": "5920d30ca5510e5f17cd8b2437dfb8602e0f68a1",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/braids_plugin.cpp", "src/dsp/braids/macro_oscillator.cc", "src/dsp/braids/analog_oscillator.cc",
+              "src/dsp/braids/digital_oscillator.cc", "src/dsp/braids/resources.cc", "src/dsp/braids/quantizer.cc",
+              "src/dsp/stmlib/utils/random.cc"],
+  "include": ["src/dsp"],
+  "defines": ["TEST"],
+  "cflags": [],
+  "cxxflags": ["-std=c++14"],
+  "cxx": true,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true},
+             {"from": "src/chain_patches/*.json", "to": "chain_patches/"},
+             {"from": "src/presets/*.braids", "to": "presets/"}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -fPIC -std=c++14 -DTEST -Isrc/dsp (braids/*.cc, stmlib random.cc, braids_plugin.cpp) -shared; dist/braids/{module.json,help.json,dsp.so,chain_patches/*.json,presets/*.braids}"
+}

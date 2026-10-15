@@ -1,0 +1,28 @@
+{
+  "id": "ruminant",
+  "repo": "mestela/schwung-ruminant",
+  "commit": "d6cdedcc1febc426bb3a06eeca74b768198f446c",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/ruminant.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "so_name": "ruminant.so",
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O3 -DNDEBUG -fPIC -shared -Isrc/dsp src/dsp/ruminant.c; dist/ruminant/{ruminant.so,module.json,README.md,LICENSE}"
+}

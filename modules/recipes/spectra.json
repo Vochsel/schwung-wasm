@@ -1,0 +1,26 @@
+{
+  "id": "spectra",
+  "repo": "filliformes/spectra-move",
+  "commit": "c631fff756cb0c511709931d53f8fc3bc00218f9",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/spectra.c"
+  ],
+  "include": [],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "spectra.so",
+  "upstream_build": "release.yml: gcc -O2 -shared -fPIC -ffast-math src/dsp/spectra.c; dist/spectra/{spectra.so,module.json (src/),help.json}"
+}

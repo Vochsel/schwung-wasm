@@ -1,0 +1,44 @@
+{
+  "id": "verglas",
+  "repo": "filliformes/verglas-move",
+  "commit": "4c159d8b131ca2c50093d03f7e1962b701e386c7",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/clouds_move.cpp",
+    "src/clouds/dsp/granular_processor.cc",
+    "src/clouds/dsp/correlator.cc",
+    "src/clouds/dsp/mu_law.cc",
+    "src/clouds/resources.cc",
+    "src/clouds/dsp/pvoc/phase_vocoder.cc",
+    "src/clouds/dsp/pvoc/stft.cc",
+    "src/clouds/dsp/pvoc/frame_transformation.cc",
+    "src/stmlib/dsp/units.cc",
+    "src/stmlib/dsp/atan.cc"
+  ],
+  "include": [
+    "src"
+  ],
+  "defines": [
+    "NDEBUG",
+    "TEST"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17",
+    "-ffast-math",
+    "-fno-exceptions",
+    "-fno-rtti"
+  ],
+  "cxx": true,
+  "assets": [
+    "module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "verglas.so",
+  "upstream_build": "scripts/build.sh: g++ -std=c++17 -O2 -ffast-math -fno-exceptions -fno-rtti -DNDEBUG -DTEST -Isrc (clouds + stmlib sources); modules/verglas/{verglas.so,module.json (root),help.json}"
+}

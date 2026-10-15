@@ -1,0 +1,34 @@
+{
+  "id": "structor",
+  "repo": "filliformes/structor-move",
+  "commit": "db3595e2089d0aba51f05d52d1d3117580953323",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/fftpack.c",
+    "src/pffft.c",
+    "src/structor.c"
+  ],
+  "include": [
+    "src"
+  ],
+  "defines": [],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "module.json",
+    {
+      "from": "ui_chain.js",
+      "optional": true
+    },
+    {
+      "from": "help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "structor.so",
+  "upstream_build": "scripts/build.sh (via release.yml): gcc -O2 -shared -fPIC -ffast-math src/{fftpack,pffft,structor}.c; dist/structor/{structor.so,module.json (root),ui_chain.js,help.json}"
+}

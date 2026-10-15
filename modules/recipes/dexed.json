@@ -1,0 +1,21 @@
+{
+  "id": "dexed",
+  "name": "Dexed",
+  "repo": "charlesvestal/schwung-dx7",
+  "commit": "07f7fed47c0ab4f706c7eb8a165d680c0cf1ee26",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/dx7_plugin.cpp", "src/dsp/msfa/dx7note.cc", "src/dsp/msfa/env.cc", "src/dsp/msfa/exp2.cc",
+              "src/dsp/msfa/fm_core.cc", "src/dsp/msfa/fm_op_kernel.cc", "src/dsp/msfa/freqlut.cc",
+              "src/dsp/msfa/lfo.cc", "src/dsp/msfa/pitchenv.cc", "src/dsp/msfa/sin.cc", "src/dsp/msfa/porta.cpp"],
+  "include": ["src/dsp"],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": ["-std=c++14"],
+  "cxx": true,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}, "src/ui.js",
+             {"from": "banks/*.syx", "to": "banks/"}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -shared -fPIC -std=c++14 -fno-gnu-unique dx7_plugin.cpp msfa/*.cc porta.cpp -Isrc/dsp; dist/dexed/{module.json,help.json,ui.js,dsp.so,banks/*.syx}"
+}

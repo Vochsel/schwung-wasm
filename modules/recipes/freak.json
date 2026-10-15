@@ -1,0 +1,56 @@
+{
+  "id": "freak",
+  "repo": "handcraftedcc/move-everything-mrhyde",
+  "commit": "3c47f35a69fa82c8554ee62c402064d6bad0a3c7",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/freak_plugin.cpp",
+    "src/dsp/plaits_move_engine.cpp",
+    "src/third_party/eurorack/plaits/dsp/engine/*.cc",
+    "src/third_party/eurorack/plaits/dsp/engine2/*.cc",
+    "src/third_party/eurorack/plaits/dsp/chords/chord_bank.cc",
+    "src/third_party/eurorack/plaits/dsp/fm/algorithms.cc",
+    "src/third_party/eurorack/plaits/dsp/fm/dx_units.cc",
+    "src/third_party/eurorack/plaits/dsp/physical_modelling/modal_voice.cc",
+    "src/third_party/eurorack/plaits/dsp/physical_modelling/resonator.cc",
+    "src/third_party/eurorack/plaits/dsp/physical_modelling/string.cc",
+    "src/third_party/eurorack/plaits/dsp/physical_modelling/string_voice.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/lpc_speech_synth.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/lpc_speech_synth_controller.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/lpc_speech_synth_phonemes.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/lpc_speech_synth_words.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/naive_speech_synth.cc",
+    "src/third_party/eurorack/plaits/dsp/speech/sam_speech_synth.cc",
+    "src/third_party/eurorack/plaits/dsp/voice.cc",
+    "src/third_party/eurorack/plaits/resources.cc",
+    "src/third_party/eurorack/plaits/user_data_receiver.cc",
+    "src/third_party/eurorack/stm_audio_bootloader/fsk/packet_decoder.cc",
+    "src/third_party/eurorack/stmlib/utils/random.cc",
+    "src/third_party/eurorack/stmlib/dsp/units.cc"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/third_party/eurorack"
+  ],
+  "defines": [
+    "TEST"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14",
+    "-include",
+    "stdio.h"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "README.md",
+    "src/help.json",
+    "src/ui.js"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -shared -fPIC -std=c++14 -DTEST -include stdio.h -Isrc -Isrc/dsp -Isrc/third_party/eurorack freak_plugin.cpp plaits_move_engine.cpp + listed plaits/stmlib sources; dist/freak/{module.json,dsp.so,README.md,help.json,ui.js}"
+}

@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><title>engine boot test</title>
+<script type="module">
+// Boots the real engine without audio output: a timer drains the ring the way
+// the AudioWorklet would, so the device thread runs at real time.
+import createSchwung from '../web/engine/schwung.js';
+const log = (...a) => { (window.__log ||= []).push(a.join(' ')); console.log(...a); };
+const M = await createSchwung({ locateFile: f => '../web/engine/' + f, print: t => log('[out]', t), printErr: t => log('[err]', t) });
+window.M = M;
+log('runtime up, crossOriginIsolated=' + crossOriginIsolated);
+if (location.search.includes('log')) { M.FS.writeFile('/data/UserData/schwung/debug_log_on', '1'); M.FS.writeFile('/data/UserData/schwung/shadow_midi_out_log_on', '1'); }
+const rc = M._sw_start(44100);
+log('sw_start ->', rc);
+const ctl = new Int32Array(M.wasmMemory.buffer, M._sw_audio_ring_ctl(), 8);
+const ring = new Int16Array(M.wasmMemory.buffer, M._sw_audio_ring(), 16 * 256);
+let peak = 0, blocks = 0;
+const t0 = performance.now();
+setInterval(() => {
+  const due = Math.floor((performance.now() - t0) / (128000 / 44100));
+  while (blocks < due && ctl[0] - ctl[1] > 0) {
+    const b = ctl[1] % ctl[2];
+    for (let i = 0; i < 256; i++) peak = Math.max(peak, Math.abs(ring[b * 256 + i]));
+    Atomics.add(ctl, 1, 1); Atomics.notify(ctl, 1); blocks++;
+  }
+}, 5);
+window.stats = () => ({ frames: M._sw_stat(0), lastUs: M._sw_stat(1), maxUs: M._sw_stat(2), disp: M._sw_stat(5), padsSeen: M._sw_stat(6), echoed: M._sw_stat(7), blocks, peak,
+  oled: Array.from(new Uint8Array(M.wasmMemory.buffer, M._sw_display(), 1024)).filter(Boolean).length,
+  leds: Array.from(new Uint8Array(M.wasmMemory.buffer, M._sw_leds(), 512)).filter(Boolean).length });
+window.resetPeak = () => { peak = 0; };
+window.oled = () => Array.from(new Uint8Array(M.wasmMemory.buffer, M._sw_display(), 1024));
+window.readFile = p => { try { return M.FS.readFile(p, { encoding: 'utf8' }); } catch (e) { return 'missing ' + p; } };
+window.readLog = () => { try { return M.FS.readFile('/data/UserData/schwung/debug.log', { encoding: 'utf8' }); } catch (e) { return 'no log: ' + e; } };
+window.ready = true;
+</script>

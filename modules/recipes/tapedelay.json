@@ -1,0 +1,16 @@
+{
+  "id": "tapedelay",
+  "repo": "charlesvestal/schwung-space-delay",
+  "commit": "87e0cbf65cdb79933718e662552864d15080c714",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/spacecho.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": ["-ffast-math"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}],
+  "so_name": "tapedelay.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -shared -fPIC -DNDEBUG src/dsp/spacecho.c -Isrc/dsp -lm (-Ofast => -ffast-math here); dist/tapedelay/{module.json,help.json,tapedelay.so}"
+}

@@ -1,0 +1,32 @@
+{
+  "id": "dissolver",
+  "repo": "filliformes/dissolver-move",
+  "commit": "0edff5f7bf0d41db1e383f45acd2ed4f6ccf77e7",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/dissolver.c",
+    "src/dsp/dissolver_spectral.c",
+    "src/dsp/pffft.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "PFFFT_SIMD_DISABLE"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxx": false,
+  "assets": [
+    "module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dissolver.so",
+  "upstream_build": "release.yml: gcc -O2 -shared -fPIC -ffast-math -DPFFFT_SIMD_DISABLE src/dsp/{dissolver,dissolver_spectral,pffft}.c -Isrc/dsp; dist/dissolver/{module.json (repo root),help.json,dissolver.so}"
+}

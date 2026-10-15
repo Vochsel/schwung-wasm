@@ -1,0 +1,17 @@
+{
+  "id": "303",
+  "repo": "charlesvestal/schwung-303",
+  "commit": "7680578cdecd91e512cfddb9c9eb07b287fb64f4",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": ["src/dsp/open303/*.c", "src/dsp/plugin.cpp", "src/dsp/open303/*.cpp"],
+  "include": ["src/dsp", "src/dsp/open303"],
+  "defines": [],
+  "cflags": ["-std=c99"],
+  "cxxflags": ["-std=c++17"],
+  "cxx": true,
+  "assets": ["src/module.json", "src/ui.js", {"from": "src/help.json", "optional": true}],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -std=c99 open303/*.c; g++ -O3 -std=c++17 -shared -Isrc/dsp -Isrc/dsp/open303 plugin.cpp open303/*.cpp; dist/303/{dsp.so,module.json,ui.js,help.json}"
+}

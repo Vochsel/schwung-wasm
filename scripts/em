@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Run a command inside the pinned Emscripten image, with the repo at /w.
+# Uses a local emcc if SCHWUNG_WASM_NATIVE_EMCC=1.
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+IMAGE="${EMSDK_IMAGE:-emscripten/emsdk:4.0.10-arm64}"
+[ "$(uname -m)" = "x86_64" ] && IMAGE="${EMSDK_IMAGE:-emscripten/emsdk:4.0.10}"
+if [ "${SCHWUNG_WASM_NATIVE_EMCC:-0}" = 1 ]; then cd "$ROOT" && exec "$@"; fi
+exec docker run --rm -i -e OPT -v "$ROOT":/w -v schwung-wasm-emcache:/emsdk/upstream/emscripten/cache -w "/w/${EM_CWD:-}" "$IMAGE" "$@"

@@ -1,0 +1,33 @@
+{
+  "id": "ottx",
+  "repo": "legsmechanical/schwung-ottx",
+  "commit": "8035c5e142bbf42122069c7b261f35abd510d5b9",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/ottx.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "src/ui_chain.js",
+      "optional": true
+    },
+    "LICENSE"
+  ],
+  "so_name": "ottx.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -DNDEBUG src/dsp/ottx.c -Isrc/dsp; dist/ottx/{module.json,help.json,ui_chain.js,LICENSE,ottx.so}"
+}

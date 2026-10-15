@@ -1,0 +1,16 @@
+{
+  "id": "cloudseed",
+  "repo": "charlesvestal/schwung-cloudseed",
+  "commit": "fdbc24b7cfbac167873a58407004240cefbeb0c8",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/cloudseed.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": [],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}],
+  "so_name": "cloudseed.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -shared -fPIC -DNDEBUG src/dsp/cloudseed.c -Isrc/dsp -lm; dist/cloudseed/{module.json,help.json,cloudseed.so}"
+}

@@ -1,0 +1,33 @@
+{
+  "id": "tape-echo2",
+  "repo": "athousanddetails/schwung-tape-echo2",
+  "commit": "da2e6b5126fcfe56f8ef1bb158a8ddfb28df5924",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/tape_echo_plugin.cpp",
+    "src/ported/core/TapeEchoDSP.cpp"
+  ],
+  "include": [
+    "src",
+    "src/host",
+    "src/ported/core",
+    "src/ported/shared-dpf/dsp"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "src/ui_chain.js",
+    "src/help.json",
+    "src/web_ui.html",
+    "LICENSE"
+  ],
+  "so_name": "tape-echo2.so",
+  "upstream_build": "CMakeLists.txt target tape_echo2 (C++17 -O3; tape_echo_plugin.cpp + ported/core/TapeEchoDSP.cpp). The ported dusk DSP is vendored in src/ported/core; docker-build.sh clones dusk-audio-plugins only for an equivalence test, so no external source is needed. dist/tape-echo2/{tape-echo2.so,module.json,ui_chain.js,help.json,web_ui.html,LICENSE}"
+}

@@ -1,0 +1,54 @@
+{
+  "id": "plaits",
+  "repo": "j3threejay/move-anything-plaits",
+  "commit": "6d2ab081ac729acd254f5eec66a11c3fca8910d4",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/plaits/dsp/chords/chord_bank.cc",
+    "src/dsp/plaits/dsp/engine/*.cc",
+    "src/dsp/plaits/dsp/engine2/*.cc",
+    "src/dsp/plaits/dsp/fm/algorithms.cc",
+    "src/dsp/plaits/dsp/fm/dx_units.cc",
+    "src/dsp/plaits/dsp/physical_modelling/modal_voice.cc",
+    "src/dsp/plaits/dsp/physical_modelling/resonator.cc",
+    "src/dsp/plaits/dsp/physical_modelling/string.cc",
+    "src/dsp/plaits/dsp/physical_modelling/string_voice.cc",
+    "src/dsp/plaits/dsp/speech/lpc_speech_synth.cc",
+    "src/dsp/plaits/dsp/speech/lpc_speech_synth_controller.cc",
+    "src/dsp/plaits/dsp/speech/lpc_speech_synth_phonemes.cc",
+    "src/dsp/plaits/dsp/speech/lpc_speech_synth_words.cc",
+    "src/dsp/plaits/dsp/speech/naive_speech_synth.cc",
+    "src/dsp/plaits/dsp/speech/sam_speech_synth.cc",
+    "src/dsp/plaits/dsp/voice.cc",
+    "src/dsp/plaits/resources.cc",
+    "src/dsp/stmlib/dsp/atan.cc",
+    "src/dsp/stmlib/dsp/units.cc",
+    "src/dsp/stmlib/utils/random.cc",
+    "src/dsp/plaits_plugin.cpp"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/dsp/plaits",
+    "src/dsp/stmlib"
+  ],
+  "defines": [
+    "TEST"
+  ],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/chain_patches/*.json",
+      "to": "chain_patches/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -fPIC -std=c++14 -DTEST -Isrc -Isrc/dsp -Isrc/dsp/plaits -Isrc/dsp/stmlib (listed plaits/stmlib sources + plaits_plugin.cpp); dist/plaits/{dsp.so,module.json,chain_patches/*.json}"
+}

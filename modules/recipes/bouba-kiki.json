@@ -1,0 +1,37 @@
+{
+  "id": "bouba-kiki",
+  "repo": "charlesvestal/schwung-bouba-kiki",
+  "commit": "2c2ee4bb757bfe4ff171905e625c385e1310f649",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/bouba_kiki_plugin.c",
+    "src/dsp/shape.c",
+    "src/dsp/voice.c",
+    "src/dsp/synth.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    "LICENSE",
+    "NOTICE",
+    {
+      "from": "src/ui/canvas.js",
+      "to": "canvas.js"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O3 -DNDEBUG bouba_kiki_plugin.c shape.c voice.c synth.c -Isrc/dsp; dist/bouba-kiki/{module.json,help.json,LICENSE,NOTICE,canvas.js,dsp.so}"
+}

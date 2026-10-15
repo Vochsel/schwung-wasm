@@ -1,0 +1,32 @@
+{
+  "id": "4k-eq",
+  "repo": "athousanddetails/schwung-4keq",
+  "commit": "3493c9496b1df1b6fe6a6c5f495bcc61bdbf71aa",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/fourk_eq_plugin.cpp",
+    "src/ported/shared-daf/dsp/FourKEQDSP.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/host",
+    "src/ported/shared-daf/dsp",
+    "src/ported/daf-plugin"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++17"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    "src/web_ui.html",
+    "LICENSE"
+  ],
+  "so_name": "4k-eq.so",
+  "upstream_build": "CMakeLists.txt target fourk_eq (C++17 -O3; fourk_eq_plugin.cpp + ported/shared-daf/dsp/FourKEQDSP.cpp); scripts/docker-build.sh packages dist/4k-eq/{4k-eq.so,module.json,help.json,web_ui.html,LICENSE}"
+}

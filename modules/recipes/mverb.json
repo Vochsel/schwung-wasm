@@ -1,0 +1,37 @@
+{
+  "id": "mverb",
+  "repo": "charlesvestal/schwung-mverb",
+  "commit": "edb2cbabaf453c2d97ac7188e5b5ba21679d4985",
+  "license": "GPL-3.0",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/mverb.cpp"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [],
+  "cxxflags": [],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "LICENSE",
+      "optional": true
+    },
+    {
+      "from": "NOTICE",
+      "optional": true
+    }
+  ],
+  "so_name": "mverb.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -DNDEBUG src/dsp/mverb.cpp -Isrc/dsp; dist/mverb/{module.json,help.json,LICENSE,NOTICE,mverb.so}"
+}

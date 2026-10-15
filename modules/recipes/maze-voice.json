@@ -1,0 +1,32 @@
+{
+  "id": "maze-voice",
+  "repo": "sd88me/schwung-maze",
+  "commit": "e774a674eef281248282ab47f69a9456bf6631fc",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/maze-voice/dsp/maze_voice.c"
+  ],
+  "include": [
+    "src/include"
+  ],
+  "defines": [
+    "OVERSAMPLE=2"
+  ],
+  "cflags": [
+    "-ffast-math",
+    "-fvisibility=hidden"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/maze-voice/module.json",
+    "src/maze-voice/help.json",
+    {
+      "from": "src/maze-voice/web_ui.html",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -shared -fPIC -O2 -ffast-math -fvisibility=hidden -DOVERSAMPLE=2 -Isrc/include src/maze-voice/dsp/maze_voice.c; dist/maze-voice/{dsp.so,module.json,help.json,web_ui.html}"
+}

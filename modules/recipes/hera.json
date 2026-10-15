@@ -1,0 +1,49 @@
+{
+  "id": "hera",
+  "repo": "charlesvestal/schwung-hera",
+  "commit": "7bcf8b8a0b4228daa3ef57ac095a6e6cf9a935e7",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/hera_plugin.cpp",
+    "src/dsp/Engine/HeraEnvelope.cpp",
+    "src/dsp/Engine/HeraLFO.cpp",
+    "src/dsp/Engine/HeraLFOWithEnvelope.cpp",
+    "src/dsp/Engine/HeraTables.cpp",
+    "src/dsp/Engine/bbd_line.cpp",
+    "src/dsp/Engine/bbd_filter.cpp"
+  ],
+  "include": [
+    "src/dsp",
+    "src/dsp/Engine"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    },
+    {
+      "from": "LICENSE",
+      "optional": true
+    },
+    {
+      "from": "NOTICE",
+      "optional": true
+    },
+    "src/ui.js",
+    {
+      "from": "src/presets/*.xml",
+      "to": "presets/"
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: g++ -O3 -std=c++14 hera_plugin.cpp Engine/*.cpp -Isrc/dsp -Isrc/dsp/Engine; dist/hera/{module.json,help.json,LICENSE,NOTICE,ui.js,dsp.so,presets/*.xml}"
+}

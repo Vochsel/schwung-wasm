@@ -1,0 +1,30 @@
+{
+  "id": "mono-voice",
+  "repo": "timncox/schwung-mono",
+  "commit": "ce377749c32d9cb29060f98fc8e671aa1af73bbc",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/mono_core.c",
+    "src/mono_voice.c"
+  ],
+  "include": [
+    "include",
+    "src"
+  ],
+  "defines": [],
+  "cflags": [],
+  "cxx": false,
+  "assets": [
+    "modules/sound_generators/mono-voice/module.json",
+    "src/ui_chain.js",
+    {
+      "from": "src/help_voice.json",
+      "to": "help.json"
+    },
+    "src/web_ui.html"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -shared -fPIC -Iinclude -Isrc src/mono_core.c src/mono_voice.c; mono-voice/{dsp.so,module.json,ui_chain.js,help.json (src/help_voice.json),web_ui.html}"
+}

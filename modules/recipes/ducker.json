@@ -1,0 +1,31 @@
+{
+  "id": "ducker",
+  "repo": "charlesvestal/schwung-ducker",
+  "commit": "0f1c932164fc012334dcf1e727da448a8389eaeb",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/dsp/ducker.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-ffast-math"
+  ],
+  "cxxflags": [],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "ducker.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -DNDEBUG src/dsp/ducker.c -Isrc/dsp; dist/ducker/{module.json,help.json,ducker.so}"
+}

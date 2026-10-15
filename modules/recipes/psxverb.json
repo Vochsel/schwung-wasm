@@ -1,0 +1,16 @@
+{
+  "id": "psxverb",
+  "repo": "charlesvestal/schwung-psxverb",
+  "commit": "c8cc0423807cd784888a47003a39417759fc98ac",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": ["src/dsp/psxverb.c"],
+  "include": ["src/dsp"],
+  "defines": ["NDEBUG"],
+  "cflags": ["-ffast-math"],
+  "cxx": false,
+  "assets": ["src/module.json", {"from": "src/help.json", "optional": true}],
+  "so_name": "psxverb.so",
+  "upstream_build": "scripts/build.sh: gcc -Ofast -shared -fPIC -DNDEBUG src/dsp/psxverb.c -Isrc/dsp -lm (-Ofast => -ffast-math here); dist/psxverb/{module.json,help.json,psxverb.so}"
+}

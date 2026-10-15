@@ -1,0 +1,30 @@
+{
+  "id": "sophie",
+  "repo": "mestela/schwung-sophie",
+  "commit": "abd132dc50b43f1f1bd775d3a9faf11e70fb9d9c",
+  "license": "MIT",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/sophie.c"
+  ],
+  "include": [
+    "src/dsp"
+  ],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/ui_chain.js",
+    "src/movy_config.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O3 -DNDEBUG -fPIC -shared -Isrc/dsp src/dsp/sophie.c; dist/sophie/{dsp.so,module.json,ui_chain.js,movy_config.json,README.md,LICENSE}"
+}

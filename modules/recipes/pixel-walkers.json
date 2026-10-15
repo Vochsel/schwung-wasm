@@ -1,0 +1,16 @@
+{
+  "id": "pixel-walkers",
+  "repo": "mestela/schwung-pixel-walkers",
+  "commit": "5bc3df9ebbff63cff418cf188caf1d1769d10d62",
+  "license": "MIT",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": ["src/dsp.c"],
+  "include": [],
+  "defines": [],
+  "cflags": ["-std=c11"],
+  "cxx": false,
+  "assets": ["src/module.json", "src/canvas.js", "README.md", "LICENSE"],
+  "so_name": "dsp.so",
+  "upstream_build": "scripts/build.sh: gcc -std=c11 -O2 -fPIC -shared src/dsp.c; dist/pixel-walkers/{dsp.so,module.json,canvas.js,README.md,LICENSE}"
+}

@@ -1,0 +1,42 @@
+{
+  "id": "cw78",
+  "repo": "athousanddetails/schwung-cw-78",
+  "commit": "e4b529e7c633cf7f4a01ad817b5db488a0b74cca",
+  "license": "GPL-3.0",
+  "component_type": "sound_generator",
+  "category_dir": "sound_generators",
+  "sources": [
+    "src/dsp/cr78_plugin.cpp",
+    "src/dsp/cr78_engine.cpp"
+  ],
+  "include": [
+    "src",
+    "src/dsp",
+    "src/host"
+  ],
+  "defines": [],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxxflags": [
+    "-std=c++14"
+  ],
+  "cxx": true,
+  "assets": [
+    "src/module.json",
+    {
+      "from": "src/ui_chain.js",
+      "optional": true
+    },
+    {
+      "from": "src/web_ui.html",
+      "optional": true
+    },
+    {
+      "from": "src/help.json",
+      "optional": true
+    }
+  ],
+  "so_name": "dsp.so",
+  "upstream_build": "CMakeLists.txt target cr78 (C++14 -O3; cr78_plugin.cpp + cr78_engine.cpp; -Isrc -Isrc/dsp -Isrc/host); dist/cw78/{dsp.so,module.json,ui_chain.js,web_ui.html,help.json}"
+}

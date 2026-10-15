@@ -1,0 +1,27 @@
+{
+  "id": "stereoid",
+  "repo": "legsmechanical/schwung-stereoid",
+  "commit": "7efecf1c89d1c21cf98700536b310a20457ab0af",
+  "license": "MIT",
+  "component_type": "audio_fx",
+  "category_dir": "audio_fx",
+  "sources": [
+    "src/stereoid_module.c",
+    "dsp/stereoid.c"
+  ],
+  "include": [],
+  "defines": [
+    "NDEBUG"
+  ],
+  "cflags": [
+    "-std=c11"
+  ],
+  "cxx": false,
+  "assets": [
+    "src/module.json",
+    "src/help.json",
+    "LICENSE"
+  ],
+  "so_name": "stereoid.so",
+  "upstream_build": "scripts/build.sh: gcc -O3 -std=c11 -DNDEBUG -Wall -Wextra -Werror -shared src/stereoid_module.c dsp/stereoid.c (GCC-version check skipped); dist/stereoid/{stereoid.so,module.json,help.json,LICENSE}"
+}

@@ -1,0 +1,17 @@
+{
+  "id": "groovebank",
+  "repo": "mission-minnow/groovebank",
+  "commit": "4edfa2f0a65f953f685e60b5753e725b0e5df7ce",
+  "license": "MIT",
+  "component_type": "midi_fx",
+  "category_dir": "midi_fx",
+  "sources": ["src/dsp/grooves.c", "src/host/groovebank_plugin.c"],
+  "include": ["src/dsp", "src/host"],
+  "defines": [],
+  "cflags": ["-std=c99"],
+  "cxx": false,
+  "assets": ["src/module.json", "src/canvas.js", {"from": "src/help.json", "optional": true},
+             {"from": "src/patterns/*.groove", "to": "patterns/"}],
+  "so_name": "dsp.so",
+  "upstream_build": "Makefile aarch64: gcc -std=c99 -O2 -fPIC -Isrc/dsp -Isrc/host -shared grooves.c groovebank_plugin.c; scripts/package.sh: dist/groovebank/{module.json,canvas.js,help.json,patterns/*.groove,dsp.so}"
+}
