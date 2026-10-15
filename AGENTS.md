@@ -47,6 +47,10 @@ Playwright's Chromium (`build/tools`: `npm i --prefix build/tools playwright@1.5
 - **Licences.** Module sources are cloned at build time, never committed. Don't add recipes for
   repos without a licence that allows redistribution (see docs/MODULES.md).
 
+## Deploying
+
+`bash scripts/deploy.sh` (after both builds) deploys `web/` as prebuilt static files. The Vercel project is deliberately not connected to Git: a Git build has no engine to serve and replaces the live site with 404s.
+
 ## Debugging
 
 `tests/engine.html?log` turns on Schwung's own debug log; `tests/drive.mjs` saves it to
